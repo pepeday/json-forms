@@ -1,299 +1,274 @@
 <template>
 	<div class="json-form-interface">
-		<div v-if="!props.jsonField" class="empty">
-			{{ t('select_a_field') }}
-		</div>
-		<div v-else class="field-list">
-			<v-notice v-if="loading">Loading...</v-notice>
-			<v-notice v-else-if="error" type="danger">{{ error }}</v-notice>
-			<template v-else>
-				<!-- Add the related field select -->
-				<v-field
-					:collection="props.collection"
-					:field="relationInfo?.relationField"
-					:type="relation?.meta?.interface || 'select-dropdown-m2o'"
-					:value="currentValue"
-					:disabled="false"
-					:name="relationInfo?.relationField"
-					:relation="relation"
-					:fields="[relationInfo?.jsonField]"
-					@input="handleValueChange"
-				>
-					<template #append>
-						<v-menu show-arrow placement="bottom-end">
-							<template #activator="{ toggle }">
-								<v-icon
-									name="info"
-									outline
-									@click="toggle"
-								/>
-							</template>
-							<div class="related-info">
-								<div class="related-field">
-									{{ relationInfo?.jsonField }}
-								</div>
-							</div>
-						</v-menu>
-					</template>
-				</v-field>
-
-				<!-- JSON Display -->
-				<div v-if="jsonFields && Object.keys(jsonFields).length > 0" class="json-display">
-					<div class="json-header">
-						<v-text-field
-							:model-value="relationInfo?.jsonField"
-							label="JSON Field"
-							readonly
-						/>
-					</div>
-					<v-notice type="info">
-						<div class="code-wrapper">
-							<pre><code>{{ formattedJson }}</code></pre>
-						</div>
-					</v-notice>
-				</div>
-			</template>
+		<div class="field-list">
+			<div class="dynamic-fields">
+				<v-form
+					:fields="fieldsWithNames"
+					:model-value="formValues"
+					:primary-key="'+'"
+					:autofocus="false"
+					@update:model-value="handleFormUpdate"
+				/>
+			</div>
 		</div>
 	</div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, inject } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { useApi, useStores } from '@directus/extensions-sdk';
+import { ref, computed } from 'vue';
+import { Field } from '@directus/types';
 
 const props = defineProps<{
-	value: any;
 	collection: string;
-	field: string;
-	jsonField?: string[];
-	primaryKey: string | number | null;
 }>();
 
 const emit = defineEmits(['input']);
-const { t } = useI18n();
-const api = useApi();
 
-// Add stores
-const { useRelationsStore, useCollectionsStore } = useStores();
-const relationsStore = useRelationsStore();
-const collectionsStore = useCollectionsStore();
-
-const loading = ref(false);
-const error = ref<string | null>(null);
-const jsonFields = ref<Record<string, any>>({});
-
-// Track the current interface value separately from props.value
-const currentValue = ref(props.value);
-
-// Get current form values including unsaved changes
-const values = inject<ComputedRef<Record<string, any>>>('values');
-
-// Handle value changes from the interface
-function handleValueChange(newValue: any) {
-	console.log('Interface value changed:', {
-			oldValue: currentValue.value,
-			newValue,
-			relationInfo: relationInfo.value,
-			formValues: values?.value
-		});
-		
-	const actualValue = typeof newValue === 'object' ? newValue?.id : newValue;
-	currentValue.value = actualValue;
-	emit('input', actualValue);
-}
-
-// Get relation info using the stores
-const relationInfo = computed(() => {
-	if (!props.jsonField?.[0]) return null;
-	
-	const [relationField, jsonField] = props.jsonField[0].split('.');
-	console.log('Current form values:', {
-		values: values?.value,
-		relationField,
-		currentValue: values?.value?.[relationField]
-	});
-	
-	return {
-		relationField,
-		jsonField,
-		currentFormValue: values?.value?.[relationField]
-	};
-});
-
-// Get relation using the relationField from jsonField path
-const relation = computed(() => {
-	if (!relationInfo.value?.relationField) return null;
-	const rel = relationsStore.getRelationsForField(props.collection, relationInfo.value.relationField)?.[0];
-	return {
-		...rel,
-		meta: {
-			...(rel?.meta || {}),
-			interface: 'select-dropdown-m2o'
-		}
-	};
-});
-
-const relatedCollection = computed(() => {
-	if (!relation.value?.related_collection) return null;
-	return collectionsStore.getCollection(relation.value.related_collection);
-});
-
-// Add computed for debugging
-const debugInfo = computed(() => ({
-	field: props.field,
-	collection: props.collection,
-	relationField: relationInfo.value?.relationField,
-	value: props.value,
-	primaryKey: props.primaryKey,
-	interface: relation.value?.meta?.interface,
-	currentItem: props.primaryKey ? `${props.collection}/${props.primaryKey}` : null
-}));
-
-// Watch debugInfo
-watch(debugInfo, (info) => {
-	console.log('Debug Info:', info);
-});
-
-// Watch for changes in the currentValue
-watch(
-	[currentValue, () => props.jsonField, () => props.primaryKey, () => values?.value],
-	async ([newValue, newJsonField, newPrimaryKey, formValues], [oldValue, oldJsonField, oldPrimaryKey]) => {
-		console.log('Watch triggered with:', {
-			currentValue: currentValue.value,
-			formValues,
-			relationField: relationInfo.value?.relationField,
-			relationValue: formValues?.[relationInfo.value?.relationField],
-			value: props.value,
-			primaryKey: props.primaryKey
-		});
-
-		// Use form value if available
-		const relatedId = formValues?.[relationInfo.value?.relationField] ?? currentValue.value;
-
-		// Skip if we don't have a valid primary key
-		if (!newPrimaryKey || newPrimaryKey === '+') {
-			console.log('No valid primary key, skipping fetch');
-			jsonFields.value = {};
-			return;
-		}
-
-		loading.value = true;
-		error.value = null;
-
-		try {
-			if (!relationInfo.value || !relation.value?.related_collection) {
-				throw new Error('Invalid relation configuration');
+// Static JSON structure
+const jsonStructure = [
+	{
+		"field": "quantity",
+		"name": "Item Quantity",
+		"meta": {
+			"interface": "input",
+			"type": "integer",
+			"width": "half",
+			"options": {
+				"min": 0,
+				"max": 100,
+				"step": 1,
+				"placeholder": "Enter quantity"
 			}
-
-			console.log('Using related ID:', {
-				fromInterface: relatedId,
-				relationField: relationInfo.value.relationField
-			});
-
-			if (relatedId) {
-				console.log('Fetching related item:', {
-					collection: relation.value.related_collection,
-					id: relatedId,
-					jsonField: relationInfo.value.jsonField
-				});
-
-				const response = await api.get(`/items/${relation.value.related_collection}/${relatedId}`, {
-					params: {
-						fields: [relationInfo.value.jsonField]
-					}
-				});
-
-				const item = response.data.data;
-				console.log('Related item response:', item);
-
-				if (item && item[relationInfo.value.jsonField]) {
-					jsonFields.value = item[relationInfo.value.jsonField];
-					console.log('Updated jsonFields with:', jsonFields.value);
-				} else {
-					console.log('No JSON field found in item:', {
-						item,
-						expectedField: relationInfo.value.jsonField
-					});
-					jsonFields.value = {};
-				}
-			} else {
-				console.log('No related ID available');
-				jsonFields.value = {};
+		},
+		"value": 1
+	},
+	{
+		"field": "description",
+		"name": "$t:description",
+		"meta": {
+			"interface": "input-multiline",
+			"type": "text",
+			"width": "full",
+			"options": {
+				"placeholder": "Enter description",
+				"font": "sans-serif"
 			}
-		} catch (err: any) {
-			console.error('Error fetching data:', err);
-			error.value = err.message;
-			jsonFields.value = {};
-		} finally {
-			loading.value = false;
+		},
+		"value": ""
+	},
+	{
+		"field": "date_required",
+		"name": "Required Date",
+		"meta": {
+			"interface": "datetime",
+			"type": "timestamp",
+			"width": "half",
+			"options": {
+				"includeSeconds": false,
+				"mode": "datetime",
+				"use24": true
+			}
+		},
+		"value": null
+	},
+	{
+		"field": "delivery_date",
+		"name": "Delivery Date",
+		"meta": {
+			"interface": "datetime",
+			"type": "date",
+			"width": "half",
+			"options": {
+				"mode": "date"
+			}
+		},
+		"value": null
+	},
+	{
+		"field": "price",
+		"name": "Price",
+		"meta": {
+			"interface": "input",
+			"type": "decimal",
+			"width": "half",
+			"options": {
+				"min": 0,
+				"step": 0.01,
+				"placeholder": "Enter price"
+			}
+		},
+		"value": 0
+	},
+	{
+		"field": "is_active",
+		"name": "Active Status",
+		"meta": {
+			"interface": "boolean",
+			"width": "half",
+			"options": {
+				"label": "Is this item active?"
+			}
+		},
+		"value": true
+	},
+	{
+		"field": "notice_field",
+		"meta": {
+			"interface": "presentation-notice",
+			"width": "full",
+			"options": {
+				"text": "Please review all fields carefully before submitting",
+				"type": "info"
+			}
 		}
 	},
-	{ 
-		immediate: true,
-		deep: true
+	{
+		"field": "item_type",
+		"name": "Item Type",
+		"meta": {
+			"interface": "select-dropdown",
+			"width": "half",
+			"options": {
+				"choices": [
+					{
+						"text": "Type A",
+						"value": "a"
+					},
+					{
+						"text": "Type B",
+						"value": "b"
+					},
+					{
+						"text": "Type C",
+						"value": "c"
+					}
+				]
+			}
+		},
+		"value": "a"
 	}
-);
+];
 
-// Add watcher for jsonFields to see updates
-watch(jsonFields, (newValue) => {
-	console.log('jsonFields updated:', newValue);
-}, { deep: true });
+const fields = ref(jsonStructure);
 
-// Add computed for formatted JSON
-const formattedJson = computed(() => {
-	try {
-		return JSON.stringify(jsonFields.value, null, 2);
-	} catch (err) {
-		return '';
-	}
+// Convert fields to the format expected by v-form
+const fieldsWithNames = computed(() => {
+	return fields.value.map((field) => ({
+		...field,
+		collection: props.collection,
+		schema: null,
+		meta: {
+			...field.meta,
+			field: field.field,
+			collection: props.collection,
+			...(field.meta?.interface === 'input' && {
+				type: field.meta.type || 'string',
+				...(field.meta.type === 'decimal' && {
+					min: field.meta.options?.min,
+					max: field.meta.options?.max,
+					step: field.meta.options?.step || 0.01
+				}),
+				...(field.meta.type === 'integer' && {
+					min: field.meta.options?.min,
+					max: field.meta.options?.max,
+					step: field.meta.options?.step || 1
+				})
+			}),
+			...(field.meta?.interface === 'datetime' && {
+				type: field.meta.type || 'timestamp',
+				mode: field.meta.options?.mode || 'datetime',
+				includeSeconds: field.meta.options?.includeSeconds || false,
+				use24: field.meta.options?.use24 ?? true
+			}),
+		},
+		type: field.meta?.type || (
+			field.meta?.interface === 'datetime' ? 'timestamp' : 
+			field.meta?.interface === 'input' ? 'string' : 'string'
+		),
+	}));
 });
+
+const formValues = computed(() => {
+	const values: Record<string, any> = {};
+	fields.value.forEach(field => {
+		if (field.meta?.interface === 'datetime') {
+			values[field.field] = field.value || null;
+		} else if (field.meta?.interface === 'input') {
+			switch (field.meta.type) {
+				case 'integer':
+					values[field.field] = field.value !== null ? parseInt(field.value) : null;
+					break;
+				case 'decimal':
+					values[field.field] = field.value !== null ? parseFloat(field.value) : null;
+					break;
+				default:
+					values[field.field] = field.value;
+			}
+		} else {
+			values[field.field] = field.value;
+		}
+	});
+	return values;
+});
+
+function handleFormUpdate(newValues: Record<string, any>) {
+	console.log('Form values updated:', newValues);
+	
+	fields.value = fields.value.map(field => {
+		const newValue = newValues[field.field];
+		
+		if (field.meta?.interface === 'datetime') {
+			console.log('Datetime field update:', {
+				field: field.field,
+				newValue,
+				type: typeof newValue,
+				mode: field.meta.options?.mode
+			});
+		} else if (field.meta?.interface === 'input') {
+			console.log('Input field update:', {
+				field: field.field,
+				newValue,
+				type: field.meta.type
+			});
+		}
+		
+		return {
+			...field,
+			value: newValue,
+		};
+	});
+	
+	console.log('Updated fields:', fields.value);
+	emit('input', fields.value);
+}
 </script>
 
 <style lang="scss" scoped>
 .json-form-interface {
 	width: 100%;
 	
-	.empty {
-		color: var(--theme--form--field--input--foreground-subdued);
-		font-style: italic;
-	}
-
 	.field-list {
 		border: var(--theme--border-width) solid var(--theme--form--field--input--border-color);
 		border-radius: var(--theme--border-radius);
 		padding: var(--theme--form--field--input--padding);
 	}
 
-	.json-display {
-		margin-top: 12px;
-
-		.json-header {
-			margin-bottom: 8px;
-		}
-
-		.code-wrapper {
-			max-height: 400px;
-			overflow: auto;
+	.dynamic-fields {
+		.field-wrapper {
+			margin-bottom: 12px;
 			
-			pre {
-				margin: 0;
-				white-space: pre-wrap;
+			&.half {
+				width: calc(50% - 8px);
+				display: inline-block;
 				
-				code {
-					font-family: var(--theme--font-family-monospace);
-					font-size: 14px;
-					line-height: 1.5;
+				&:nth-child(odd) {
+					margin-right: 16px;
 				}
 			}
-		}
-	}
-
-	.related-info {
-		padding: 8px;
-		.related-field {
-			font-family: monospace;
-			color: var(--theme--form--field--input--foreground-subdued);
+			
+			&.full {
+				width: 100%;
+			}
 		}
 	}
 }
