@@ -1,0 +1,139 @@
+[
+    {
+        "field": "quantity",
+        "name": "Item Quantity",
+        "meta": {
+            "interface": "input",
+            "type": "integer",
+            "width": "half",
+            "options": {
+                "min": 0,
+                "max": 100,
+                "step": 1,
+                "placeholder": "Enter quantity"
+            }
+        },
+        "value": 33
+    },
+    {
+        "field": "temperature",
+        "name": "Fridge temperature",
+        "meta": {
+            "interface": "input",
+            "type": "integer",
+            "width": "half",
+            "options": {
+                "min": 0,
+                "max": 100,
+                "step": 1,
+                "placeholder": "Enter quantity"
+            }
+        },
+        "value": 33
+    },
+    {
+        "field": "description",
+        "name": "Description",
+        "meta": {
+            "interface": "input-multiline",
+            "type": "text",
+            "width": "full",
+            "options": {
+                "placeholder": "Enter description",
+                "font": "sans-serif"
+            }
+        },
+        "value": "updated_in_database"
+    },
+    {
+        "field": "date_required",
+        "name": "Required Date",
+        "meta": {
+            "interface": "datetime",
+            "type": "timestamp",
+            "width": "half",
+            "options": {
+                "includeSeconds": false,
+                "mode": "datetime",
+                "use24": true
+            }
+        },
+        "value": "2024-12-03T12:00:00+02:00"
+    },
+    {
+        "field": "delivery_date",
+        "name": "Delivery Date",
+        "meta": {
+            "interface": "datetime",
+            "type": "date",
+            "width": "half",
+            "options": {
+                "mode": "date"
+            }
+        },
+        "value": "2024-12-11"
+    },
+    {
+        "field": "price",
+        "name": "Price",
+        "meta": {
+            "interface": "input",
+            "type": "decimal",
+            "width": "half",
+            "options": {
+                "min": 0,
+                "step": 0.01,
+                "placeholder": "Enter price"
+            }
+        },
+        "value": 1.2
+    },
+    {
+        "field": "is_active",
+        "name": "Active Status",
+        "meta": {
+            "interface": "boolean",
+            "width": "half",
+            "options": {
+                "label": "Is this item active?"
+            }
+        },
+        "value": true
+    },
+    {
+        "field": "notice_field",
+        "meta": {
+            "interface": "presentation-notice",
+            "width": "full",
+            "options": {
+                "text": "This is item 142",
+                "type": "info"
+            }
+        }
+    },
+    {
+        "field": "item_type",
+        "name": "Item Type",
+        "meta": {
+            "interface": "select-dropdown",
+            "width": "half",
+            "options": {
+                "choices": [
+                    {
+                        "text": "Type A",
+                        "value": "a"
+                    },
+                    {
+                        "text": "Type B",
+                        "value": "b"
+                    },
+                    {
+                        "text": "Type C",
+                        "value": "c"
+                    }
+                ]
+            }
+        },
+        "value": "a"
+    }
+]
