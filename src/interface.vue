@@ -261,9 +261,7 @@ function handleUpdate(updatedFields: any[]) {
 	}
 
 	.field-list {
-		border: var(--theme--border-width) solid var(--theme--form--field--input--border-color);
-		border-radius: var(--theme--border-radius);
-		padding: var(--theme--form--field--input--padding);
+		padding: var(--theme--form--field--input--padding) 0px;
 	}
 
 	.related-info {
