@@ -10,8 +10,15 @@ A custom interface extension for Directus that allows you to create dynamic form
 - Support for various field types:
   - Text inputs
   - Numbers (integer/decimal)
-  - DateTime fields
-  - And more...
+  - DateTime/Date fields
+  - Dropdown
+  - Boolean
+  - Presentation (Info, Warning, Error)
+
+## Bugs
+
+- When saving the item using the "Save and stay" button, the form is not updated with the new values, even though the item is updated.
+- Others?
 
 ## Installation
 
