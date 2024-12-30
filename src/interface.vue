@@ -1,13 +1,10 @@
 <template>
-	<div class="json-form-interface">
-		<div v-if="!props.jsonField" class="empty">
-			{{ t('select_a_field') }}
-		</div>
-		<div v-else class="field-list">
-			<v-notice v-if="loading">Loading...</v-notice>
-			<v-notice v-else-if="error" type="danger">{{ error }}</v-notice>
-			<template v-else>
-				<!-- Add the related field select -->
+	<div v-if="props.jsonField" class="json-form-interface">
+		<v-notice v-if="loading">Loading...</v-notice>
+		<v-notice v-else-if="error" type="danger">{{ error }}</v-notice>
+		<template v-else>
+			<!-- Relation field -->
+			<div class="field-list">
 				<v-field
 					:collection="props.collection"
 					:field="relationInfo?.relationField"
@@ -32,20 +29,17 @@
 						</v-menu>
 					</template>
 				</v-field>
+			</div>
 
-				<!-- Dynamic Form -->
-				<dynamic-form
-					v-if="Array.isArray(jsonFields) && jsonFields.length > 0"
-					:fields="jsonFields"
-					:collection="collection"
-					:source-id="currentValue"
-					@update="handleUpdate"
-				/>
-				<v-notice v-else-if="!loading" type="info">
-					{{ t('no_fields_available') }}
-				</v-notice>
-			</template>
-		</div>
+			<!-- Only render dynamic form if we have fields -->
+			<dynamic-form
+				v-if="jsonFields && jsonFields.length > 0"
+				:fields="jsonFields"
+				:collection="collection"
+				:source-id="currentValue"
+				@update="handleUpdate"
+			/>
+		</template>
 	</div>
 </template>
 
