@@ -188,58 +188,51 @@ watch(
 			emit('input', jsonFields.value);
 			isHandlingValueUpdate.value = false;
 			isInitialized.value = true;
-			isInitialLoad.value = false;
 			lastProcessedValue.value = currentRelatedValue;
 			hasLoadedLocalData.value = true;
 			return;
 		}
 
-		// Then handle relation changes
-		if ((currentRelatedValue !== lastProcessedValue.value || isRelationChange.value) && !isInitialLoad.value) {
+		// Then handle relation changes or initial relation selection
+		if ((currentRelatedValue !== lastProcessedValue.value || isRelationChange.value) && currentRelatedValue) {
 			lastProcessedValue.value = currentRelatedValue;
 			
-			if (currentRelatedValue) {
-				try {
-					loading.value = true;
-					error.value = null;
-					isLoadingTemplate.value = true;
+			try {
+				loading.value = true;
+				error.value = null;
+				isLoadingTemplate.value = true;
 
-					console.log('Fetching template from related record:', JSON.stringify({
-						collection: relation.value?.related_collection,
-						id: currentRelatedValue,
-						field: relationInfo.value.jsonField
-					}, null, 2));
+				console.log('Fetching template from related record:', JSON.stringify({
+					collection: relation.value?.related_collection,
+					id: currentRelatedValue,
+					field: relationInfo.value.jsonField
+				}, null, 2));
 
-					const response = await api.get(`/items/${relation.value?.related_collection}/${currentRelatedValue}`, {
-						params: {
-							fields: [relationInfo.value.jsonField]
-						}
-					});
-
-					const item = response.data.data;
-					const fields = item?.[relationInfo.value.jsonField];
-					
-					if (Array.isArray(fields) && fields.length > 0) {
-						jsonFields.value = JSON.parse(JSON.stringify(fields));
-						isHandlingValueUpdate.value = true;
-						emit('input', jsonFields.value);
-						isHandlingValueUpdate.value = false;
-						isInitialized.value = true;
-					} else {
-						clearFormData();
+				const response = await api.get(`/items/${relation.value?.related_collection}/${currentRelatedValue}`, {
+					params: {
+						fields: [relationInfo.value.jsonField]
 					}
-				} catch (err: any) {
-					console.error('Error fetching template JSON:', JSON.stringify(err, null, 2));
-					error.value = err.message;
+				});
+
+				const item = response.data.data;
+				const fields = item?.[relationInfo.value.jsonField];
+				
+				if (Array.isArray(fields) && fields.length > 0) {
+					jsonFields.value = JSON.parse(JSON.stringify(fields));
+					isHandlingValueUpdate.value = true;
+					emit('input', jsonFields.value);
+					isHandlingValueUpdate.value = false;
+					isInitialized.value = true;
+				} else {
 					clearFormData();
-				} finally {
-					loading.value = false;
-					isLoadingTemplate.value = false;
-					isInitialLoad.value = false;
-					isRelationChange.value = false;
 				}
-			} else {
+			} catch (err: any) {
+				console.error('Error fetching template JSON:', JSON.stringify(err, null, 2));
+				error.value = err.message;
 				clearFormData();
+			} finally {
+				loading.value = false;
+				isLoadingTemplate.value = false;
 				isInitialLoad.value = false;
 				isRelationChange.value = false;
 			}
