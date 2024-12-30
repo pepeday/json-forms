@@ -85,11 +85,6 @@ const relationInfo = computed(() => {
 	if (!props.jsonField?.[0]) return null;
 	
 	const [relationField, jsonField] = props.jsonField[0].split('.');
-	console.log('Current form values:', JSON.stringify({
-		values: values?.value,
-		relationField,
-		currentValue: values?.value?.[relationField]
-	}, null, 2));
 	
 	return {
 		relationField,
@@ -133,11 +128,7 @@ const localJsonValue = computed(() => {
 	if (!values?.value || !props.field) return null;
 	// Get the JSON array from the local value
 	const localValue = values.value[props.field];
-	console.log('Checking local value:', {
-		field: props.field,
-		value: localValue,
-		isArray: Array.isArray(localValue)
-	});
+
 	return Array.isArray(localValue) ? localValue : null;
 });
 
@@ -159,17 +150,7 @@ function clearFormData() {
 watch(
 	[() => values?.value, () => props.field],
 	async ([formValues, field]) => {
-		console.log('Watch triggered:', JSON.stringify({
-			formValues,
-			currentField: props.field,
-			isUpdating: isUpdating.value,
-			isLoadingTemplate: isLoadingTemplate.value,
-			isHandlingValueUpdate: isHandlingValueUpdate.value,
-			isInitialLoad: isInitialLoad.value,
-			lastProcessedValue: lastProcessedValue.value,
-			isRelationChange: isRelationChange.value,
-			hasLoadedLocalData: hasLoadedLocalData.value
-		}, null, 2));
+
 
 		// Skip if no relation info is available
 		if (!relationInfo.value) return;
@@ -182,7 +163,6 @@ watch(
 
 		// First check for local data on initial load
 		if (!hasLoadedLocalData.value && Array.isArray(localJsonData) && localJsonData.length > 0) {
-			console.log('Using existing local JSON data on initial load');
 			jsonFields.value = JSON.parse(JSON.stringify(localJsonData));
 			isHandlingValueUpdate.value = true;
 			emit('input', jsonFields.value);
@@ -201,12 +181,6 @@ watch(
 				loading.value = true;
 				error.value = null;
 				isLoadingTemplate.value = true;
-
-				console.log('Fetching template from related record:', JSON.stringify({
-					collection: relation.value?.related_collection,
-					id: currentRelatedValue,
-					field: relationInfo.value.jsonField
-				}, null, 2));
 
 				const response = await api.get(`/items/${relation.value?.related_collection}/${currentRelatedValue}`, {
 					params: {
@@ -243,11 +217,7 @@ watch(
 
 // Modify handleValueChange
 function handleValueChange(newValue: any) {
-	console.log('Value change:', JSON.stringify({
-		oldValue: currentValue.value,
-		newValue,
-		actualValue: typeof newValue === 'object' ? newValue?.id : newValue
-	}, null, 2));
+
 
 	const actualValue = typeof newValue === 'object' ? newValue?.id : newValue;
 	
@@ -261,7 +231,6 @@ function handleValueChange(newValue: any) {
 
 // Modify handleUpdate
 function handleUpdate(updatedFields: any[]) {
-	console.log('Form update:', JSON.stringify(updatedFields, null, 2));
 	
 	if (!isInitialized.value) return;
 
