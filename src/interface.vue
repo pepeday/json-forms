@@ -1,274 +1,314 @@
 <template>
 	<div class="json-form-interface">
-		<div class="field-list">
-			<div class="dynamic-fields">
-				<v-form
-					:fields="fieldsWithNames"
-					:model-value="formValues"
-					:primary-key="'+'"
-					:autofocus="false"
-					@update:model-value="handleFormUpdate"
+		<div v-if="!props.jsonField" class="empty">
+			{{ t('select_a_field') }}
+		</div>
+		<div v-else class="field-list">
+			<v-notice v-if="loading">Loading...</v-notice>
+			<v-notice v-else-if="error" type="danger">{{ error }}</v-notice>
+			<template v-else>
+				<!-- Add the related field select -->
+				<v-field
+					:collection="props.collection"
+					:field="relationInfo?.relationField"
+					:type="relation?.meta?.interface || 'select-dropdown-m2o'"
+					:value="currentValue"
+					:disabled="false"
+					:name="relationInfo?.relationField"
+					:relation="relation"
+					:fields="[relationInfo?.jsonField]"
+					@input="handleValueChange"
+				>
+					<template #append>
+						<v-menu show-arrow placement="bottom-end">
+							<template #activator="{ toggle }">
+								<v-icon name="info" outline @click="toggle" />
+							</template>
+							<div class="related-info">
+								<div class="related-field">
+									{{ relationInfo?.jsonField }}
+								</div>
+							</div>
+						</v-menu>
+					</template>
+				</v-field>
+
+				<!-- Dynamic Form -->
+				<dynamic-form
+					v-if="Array.isArray(jsonFields) && jsonFields.length > 0"
+					:fields="jsonFields"
+					:collection="collection"
+					:source-id="currentValue"
+					@update="handleUpdate"
 				/>
-			</div>
+				<v-notice v-else-if="!loading" type="info">
+					{{ t('no_fields_available') }}
+				</v-notice>
+			</template>
 		</div>
 	</div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { Field } from '@directus/types';
+import { ref, computed, watch, inject, type ComputedRef } from 'vue';
+import { useI18n } from 'vue-i18n';
+import { useApi, useStores } from '@directus/extensions-sdk';
+import DynamicForm from './dynamic-form.vue';
 
 const props = defineProps<{
 	collection: string;
+	value: any;
+	field: string;
+	jsonField?: string[];
+	primaryKey: string | number | null;
 }>();
 
 const emit = defineEmits(['input']);
+const { t } = useI18n();
+const api = useApi();
 
-// Static JSON structure
-const jsonStructure = [
-	{
-		"field": "quantity",
-		"name": "Item Quantity",
-		"meta": {
-			"interface": "input",
-			"type": "integer",
-			"width": "half",
-			"options": {
-				"min": 0,
-				"max": 100,
-				"step": 1,
-				"placeholder": "Enter quantity"
-			}
-		},
-		"value": 1
-	},
-	{
-		"field": "description",
-		"name": "$t:description",
-		"meta": {
-			"interface": "input-multiline",
-			"type": "text",
-			"width": "full",
-			"options": {
-				"placeholder": "Enter description",
-				"font": "sans-serif"
-			}
-		},
-		"value": ""
-	},
-	{
-		"field": "date_required",
-		"name": "Required Date",
-		"meta": {
-			"interface": "datetime",
-			"type": "timestamp",
-			"width": "half",
-			"options": {
-				"includeSeconds": false,
-				"mode": "datetime",
-				"use24": true
-			}
-		},
-		"value": null
-	},
-	{
-		"field": "delivery_date",
-		"name": "Delivery Date",
-		"meta": {
-			"interface": "datetime",
-			"type": "date",
-			"width": "half",
-			"options": {
-				"mode": "date"
-			}
-		},
-		"value": null
-	},
-	{
-		"field": "price",
-		"name": "Price",
-		"meta": {
-			"interface": "input",
-			"type": "decimal",
-			"width": "half",
-			"options": {
-				"min": 0,
-				"step": 0.01,
-				"placeholder": "Enter price"
-			}
-		},
-		"value": 0
-	},
-	{
-		"field": "is_active",
-		"name": "Active Status",
-		"meta": {
-			"interface": "boolean",
-			"width": "half",
-			"options": {
-				"label": "Is this item active?"
-			}
-		},
-		"value": true
-	},
-	{
-		"field": "notice_field",
-		"meta": {
-			"interface": "presentation-notice",
-			"width": "full",
-			"options": {
-				"text": "Please review all fields carefully before submitting",
-				"type": "info"
-			}
-		}
-	},
-	{
-		"field": "item_type",
-		"name": "Item Type",
-		"meta": {
-			"interface": "select-dropdown",
-			"width": "half",
-			"options": {
-				"choices": [
-					{
-						"text": "Type A",
-						"value": "a"
-					},
-					{
-						"text": "Type B",
-						"value": "b"
-					},
-					{
-						"text": "Type C",
-						"value": "c"
-					}
-				]
-			}
-		},
-		"value": "a"
-	}
-];
+// Add stores
+const { useRelationsStore, useCollectionsStore } = useStores();
+const relationsStore = useRelationsStore();
+const collectionsStore = useCollectionsStore();
 
-const fields = ref(jsonStructure);
+const loading = ref(false);
+const error = ref<string | null>(null);
+const jsonFields = ref<any[]>([]);
+const currentValue = ref(props.value);
 
-// Convert fields to the format expected by v-form
-const fieldsWithNames = computed(() => {
-	return fields.value.map((field) => ({
-		...field,
-		collection: props.collection,
-		schema: null,
+// Get current form values including unsaved changes
+const values = inject<ComputedRef<Record<string, any>>>('values');
+
+// Get relation info using the stores
+const relationInfo = computed(() => {
+	if (!props.jsonField?.[0]) return null;
+	
+	const [relationField, jsonField] = props.jsonField[0].split('.');
+	console.log('Current form values:', JSON.stringify({
+		values: values?.value,
+		relationField,
+		currentValue: values?.value?.[relationField]
+	}, null, 2));
+	
+	return {
+		relationField,
+		jsonField,
+		currentFormValue: values?.value?.[relationField]
+	};
+});
+
+// Get relation using the relationField from jsonField path
+const relation = computed(() => {
+	if (!relationInfo.value?.relationField) return null;
+	const rel = relationsStore.getRelationsForField(props.collection, relationInfo.value.relationField)?.[0];
+	return {
+		...rel,
 		meta: {
-			...field.meta,
-			field: field.field,
-			collection: props.collection,
-			...(field.meta?.interface === 'input' && {
-				type: field.meta.type || 'string',
-				...(field.meta.type === 'decimal' && {
-					min: field.meta.options?.min,
-					max: field.meta.options?.max,
-					step: field.meta.options?.step || 0.01
-				}),
-				...(field.meta.type === 'integer' && {
-					min: field.meta.options?.min,
-					max: field.meta.options?.max,
-					step: field.meta.options?.step || 1
-				})
-			}),
-			...(field.meta?.interface === 'datetime' && {
-				type: field.meta.type || 'timestamp',
-				mode: field.meta.options?.mode || 'datetime',
-				includeSeconds: field.meta.options?.includeSeconds || false,
-				use24: field.meta.options?.use24 ?? true
-			}),
-		},
-		type: field.meta?.type || (
-			field.meta?.interface === 'datetime' ? 'timestamp' : 
-			field.meta?.interface === 'input' ? 'string' : 'string'
-		),
-	}));
+			...(rel?.meta || {}),
+			interface: 'select-dropdown-m2o'
+		}
+	};
 });
 
-const formValues = computed(() => {
-	const values: Record<string, any> = {};
-	fields.value.forEach(field => {
-		if (field.meta?.interface === 'datetime') {
-			values[field.field] = field.value || null;
-		} else if (field.meta?.interface === 'input') {
-			switch (field.meta.type) {
-				case 'integer':
-					values[field.field] = field.value !== null ? parseInt(field.value) : null;
-					break;
-				case 'decimal':
-					values[field.field] = field.value !== null ? parseFloat(field.value) : null;
-					break;
-				default:
-					values[field.field] = field.value;
-			}
-		} else {
-			values[field.field] = field.value;
-		}
-	});
-	return values;
+const relatedCollection = computed(() => {
+	if (!relation.value?.related_collection) return null;
+	return collectionsStore.getCollection(relation.value.related_collection);
 });
 
-function handleFormUpdate(newValues: Record<string, any>) {
-	console.log('Form values updated:', newValues);
-	
-	fields.value = fields.value.map(field => {
-		const newValue = newValues[field.field];
-		
-		if (field.meta?.interface === 'datetime') {
-			console.log('Datetime field update:', {
-				field: field.field,
-				newValue,
-				type: typeof newValue,
-				mode: field.meta.options?.mode
-			});
-		} else if (field.meta?.interface === 'input') {
-			console.log('Input field update:', {
-				field: field.field,
-				newValue,
-				type: field.meta.type
-			});
-		}
-		
-		return {
-			...field,
-			value: newValue,
-		};
+// Add state management flags
+const isInitialized = ref(false);
+const isLoadingTemplate = ref(false);
+const isUpdating = ref(false);
+let updateTimeout: NodeJS.Timeout;
+
+// Add a flag to track if we're currently handling a value update
+const isHandlingValueUpdate = ref(false);
+
+// Add a ref to track the last fetched ID
+const lastFetchedId = ref<string | number | null>(null);
+
+// Add a computed to check if we have a local value
+const localJsonValue = computed(() => {
+	if (!values?.value || !props.field) return null;
+	// Get the JSON array from the local value
+	const localValue = values.value[props.field];
+	console.log('Checking local value:', {
+		field: props.field,
+		value: localValue,
+		isArray: Array.isArray(localValue)
 	});
-	
-	console.log('Updated fields:', fields.value);
-	emit('input', fields.value);
+	return Array.isArray(localValue) ? localValue : null;
+});
+
+// Add refs to track state
+const isInitialLoad = ref(true);
+const lastProcessedValue = ref<number | null>(null);
+const isRelationChange = ref(false);
+const hasLoadedLocalData = ref(false);
+
+// Add a function to clear form data
+function clearFormData() {
+	jsonFields.value = [];
+	isHandlingValueUpdate.value = true;
+	emit('input', null);
+	isHandlingValueUpdate.value = false;
 }
+
+// Modify the watch function
+watch(
+	[() => values?.value, () => props.field],
+	async ([formValues, field]) => {
+		console.log('Watch triggered:', JSON.stringify({
+			formValues,
+			currentField: props.field,
+			isUpdating: isUpdating.value,
+			isLoadingTemplate: isLoadingTemplate.value,
+			isHandlingValueUpdate: isHandlingValueUpdate.value,
+			isInitialLoad: isInitialLoad.value,
+			lastProcessedValue: lastProcessedValue.value,
+			isRelationChange: isRelationChange.value,
+			hasLoadedLocalData: hasLoadedLocalData.value
+		}, null, 2));
+
+		// Skip if no relation info is available
+		if (!relationInfo.value) return;
+
+		// Skip if we're in the middle of updates
+		if (isUpdating.value || isLoadingTemplate.value || isHandlingValueUpdate.value) return;
+
+		const currentRelatedValue = formValues?.[relationInfo.value.relationField];
+		const localJsonData = formValues?.[field];
+
+		// First check for local data on initial load
+		if (!hasLoadedLocalData.value && Array.isArray(localJsonData) && localJsonData.length > 0) {
+			console.log('Using existing local JSON data on initial load');
+			jsonFields.value = JSON.parse(JSON.stringify(localJsonData));
+			isHandlingValueUpdate.value = true;
+			emit('input', jsonFields.value);
+			isHandlingValueUpdate.value = false;
+			isInitialized.value = true;
+			isInitialLoad.value = false;
+			lastProcessedValue.value = currentRelatedValue;
+			hasLoadedLocalData.value = true;
+			return;
+		}
+
+		// Then handle relation changes
+		if ((currentRelatedValue !== lastProcessedValue.value || isRelationChange.value) && !isInitialLoad.value) {
+			lastProcessedValue.value = currentRelatedValue;
+			
+			if (currentRelatedValue) {
+				try {
+					loading.value = true;
+					error.value = null;
+					isLoadingTemplate.value = true;
+
+					console.log('Fetching template from related record:', JSON.stringify({
+						collection: relation.value?.related_collection,
+						id: currentRelatedValue,
+						field: relationInfo.value.jsonField
+					}, null, 2));
+
+					const response = await api.get(`/items/${relation.value?.related_collection}/${currentRelatedValue}`, {
+						params: {
+							fields: [relationInfo.value.jsonField]
+						}
+					});
+
+					const item = response.data.data;
+					const fields = item?.[relationInfo.value.jsonField];
+					
+					if (Array.isArray(fields) && fields.length > 0) {
+						jsonFields.value = JSON.parse(JSON.stringify(fields));
+						isHandlingValueUpdate.value = true;
+						emit('input', jsonFields.value);
+						isHandlingValueUpdate.value = false;
+						isInitialized.value = true;
+					} else {
+						clearFormData();
+					}
+				} catch (err: any) {
+					console.error('Error fetching template JSON:', JSON.stringify(err, null, 2));
+					error.value = err.message;
+					clearFormData();
+				} finally {
+					loading.value = false;
+					isLoadingTemplate.value = false;
+					isInitialLoad.value = false;
+					isRelationChange.value = false;
+				}
+			} else {
+				clearFormData();
+				isInitialLoad.value = false;
+				isRelationChange.value = false;
+			}
+		}
+	},
+	{ immediate: true }
+);
+
+// Modify handleValueChange
+function handleValueChange(newValue: any) {
+	console.log('Value change:', JSON.stringify({
+		oldValue: currentValue.value,
+		newValue,
+		actualValue: typeof newValue === 'object' ? newValue?.id : newValue
+	}, null, 2));
+
+	const actualValue = typeof newValue === 'object' ? newValue?.id : newValue;
+	
+	currentValue.value = actualValue;
+	lastProcessedValue.value = null; // Reset to force reload
+	isRelationChange.value = true;
+	isInitialized.value = false;
+	error.value = null;
+	clearFormData(); // Clear existing fields immediately
+}
+
+// Modify handleUpdate
+function handleUpdate(updatedFields: any[]) {
+	console.log('Form update:', JSON.stringify(updatedFields, null, 2));
+	
+	if (!isInitialized.value) return;
+
+	isUpdating.value = true;
+	jsonFields.value = JSON.parse(JSON.stringify(updatedFields));
+	
+	clearTimeout(updateTimeout);
+	updateTimeout = setTimeout(() => {
+		isHandlingValueUpdate.value = true;
+		emit('input', jsonFields.value);
+		isHandlingValueUpdate.value = false;
+		isUpdating.value = false;
+	}, 300);
+}
+
+// Add all other functions from the provided code...
+// (handleValueChange, etc.)
+
 </script>
 
 <style lang="scss" scoped>
 .json-form-interface {
 	width: 100%;
 	
+	.empty {
+		color: var(--theme--form--field--input--foreground-subdued);
+		font-style: italic;
+	}
+
 	.field-list {
 		border: var(--theme--border-width) solid var(--theme--form--field--input--border-color);
 		border-radius: var(--theme--border-radius);
 		padding: var(--theme--form--field--input--padding);
 	}
 
-	.dynamic-fields {
-		.field-wrapper {
-			margin-bottom: 12px;
-			
-			&.half {
-				width: calc(50% - 8px);
-				display: inline-block;
-				
-				&:nth-child(odd) {
-					margin-right: 16px;
-				}
-			}
-			
-			&.full {
-				width: 100%;
-			}
+	.related-info {
+		padding: 8px;
+		.related-field {
+			font-family: monospace;
+			color: var(--theme--form--field--input--foreground-subdued);
 		}
 	}
 }
