@@ -31,7 +31,7 @@
 				</v-field>
 			</div>
 
-			<!-- Only render dynamic form if we have fields -->
+			<!-- Dynamic form will show whenever we have fields -->
 			<dynamic-form
 				v-if="jsonFields && jsonFields.length > 0"
 				:fields="jsonFields"
@@ -39,6 +39,9 @@
 				:source-id="currentValue"
 				@update="handleUpdate"
 			/>
+			<v-notice v-else type="info">
+				{{ t('no_form_available') }}
+			</v-notice>
 		</template>
 	</div>
 </template>
