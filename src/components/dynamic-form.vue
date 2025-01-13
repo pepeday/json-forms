@@ -6,14 +6,15 @@
 			:model-value="formValues"
 			:primary-key="'+'"
 			:autofocus="false"
+			:validation-errors="validationErrors"
 			@update:model-value="handleFormUpdate"
 		/>
 	</div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { Field } from '@directus/types';
+import { computed, ref } from 'vue';
+import { Field, ValidationError } from '@directus/types';
 
 const props = defineProps<{
 	fields: any[];
@@ -21,10 +22,14 @@ const props = defineProps<{
 	sourceId?: string | number;
 }>();
 
-const emit = defineEmits(['update']);
+const emit = defineEmits(['update', 'validation']);
+
+const validationErrors = ref<ValidationError[]>([]);
 
 // Convert fields to the format expected by v-form
 const fieldsWithNames = computed(() => {
+	console.log('🏗️ Building fields config');
+	
 	return props.fields.map((field) => ({
 		...field,
 		collection: props.collection,
@@ -84,14 +89,40 @@ const formValues = computed(() => {
 });
 
 function handleFormUpdate(newValues: Record<string, any>) {
+	console.log('🔄 Form Update - New Values:', newValues);
+	
+	// Clear previous validation errors
+	validationErrors.value = [];
+	
 	const updatedFields = props.fields.map(field => {
 		const newValue = newValues[field.field];
+		
+		console.log(`📝 Processing field: ${field.field}`, {
+			interface: field.meta?.interface,
+			type: field.meta?.type,
+			currentValue: field.value,
+			newValue,
+		});
 		
 		if (newValue === undefined) {
 			return field;
 		}
 		
+		// Validate input fields
+		if (field.meta?.interface === 'input') {
+			const error = validateField(field, newValue);
+			if (error) {
+				validationErrors.value.push(error);
+			}
+		}
+		
 		if (field.meta?.interface === 'datetime') {
+			console.log('⏰ DateTime field update:', {
+				field: field.field,
+				value: newValue,
+				type: field.meta.type
+			});
+			
 			if (field.meta.type === 'date' && newValue) {
 				return {
 					...field,
@@ -119,7 +150,39 @@ function handleFormUpdate(newValues: Record<string, any>) {
 		};
 	});
 	
-	emit('update', updatedFields);
+	// Emit validation status
+	emit('validation', validationErrors.value);
+	
+	// Only emit update if there are no validation errors
+	if (validationErrors.value.length === 0) {
+		emit('update', updatedFields);
+	}
+}
+
+// Add validation function
+function validateField(field: any, value: any): ValidationError | null {
+	if (field.meta?.interface === 'input' && ['integer', 'decimal'].includes(field.meta.type)) {
+		const numValue = Number(value);
+		
+		if (field.meta.options?.min !== undefined && numValue < field.meta.options.min) {
+			return {
+				code: 'VALIDATION_FAILED',
+				field: field.field,
+				type: 'min',
+				message: `Value must be greater than or equal to ${field.meta.options.min}`,
+			};
+		}
+		
+		if (field.meta.options?.max !== undefined && numValue > field.meta.options.max) {
+			return {
+				code: 'VALIDATION_FAILED',
+				field: field.field,
+				type: 'max',
+				message: `Value must be less than or equal to ${field.meta.options.max}`,
+			};
+		}
+	}
+	return null;
 }
 </script>
 

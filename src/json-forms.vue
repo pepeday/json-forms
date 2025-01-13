@@ -14,6 +14,7 @@
 					:name="relationInfo?.relationField"
 					:relation="relation"
 					:fields="[relationInfo?.jsonField]"
+					:validation-errors="validationErrors"
 					@input="handleValueChange"
 				>
 					<template #append>
@@ -31,13 +32,14 @@
 				</v-field>
 			</div>
 
-			<!-- Dynamic form will show whenever we have fields -->
+			<!-- Dynamic form with validation -->
 			<dynamic-form
 				v-if="jsonFields && jsonFields.length > 0"
 				:fields="jsonFields"
 				:collection="collection"
 				:source-id="currentValue"
 				@update="handleUpdate"
+				@validation="handleValidation"
 			/>
 			<v-notice v-else type="info">
 				{{ t('no_form_available') }}
@@ -50,7 +52,8 @@
 import { ref, computed, watch, inject, type ComputedRef } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useApi, useStores } from '@directus/extensions-sdk';
-import DynamicForm from './dynamic-form.vue';
+import DynamicForm from './components/dynamic-form.vue';
+import { ValidationError } from '@directus/types';
 
 const props = defineProps<{
 	collection: string;
@@ -135,12 +138,45 @@ const lastProcessedValue = ref<number | null>(null);
 const isRelationChange = ref(false);
 const hasLoadedLocalData = ref(false);
 
-// Add a function to clear form data
-function clearFormData() {
-	jsonFields.value = [];
-	isHandlingValueUpdate.value = true;
-	emit('input', null);
-	isHandlingValueUpdate.value = false;
+// Add validation state
+const validationErrors = ref<ValidationError[]>([]);
+
+// Handle validation from dynamic form
+function handleValidation(errors: ValidationError[]) {
+	if (errors.length > 0) {
+		// If there are validation errors, emit null to prevent saving
+		emit('input', null);
+		
+		// Store validation errors to show in the interface
+		validationErrors.value = errors.map(error => ({
+			...error,
+			field: props.field, // Map to the parent field
+			code: 'VALIDATION_FAILED',
+		}));
+	} else {
+		validationErrors.value = [];
+		// Re-emit the current value if validation passes
+		emit('input', jsonFields.value);
+	}
+}
+
+// Modify handleUpdate to work with validation
+function handleUpdate(updatedFields: any[]) {
+	if (!isInitialized.value) return;
+
+	isUpdating.value = true;
+	jsonFields.value = JSON.parse(JSON.stringify(updatedFields));
+	
+	clearTimeout(updateTimeout);
+	updateTimeout = setTimeout(() => {
+		isHandlingValueUpdate.value = true;
+		// Only emit input if there are no validation errors
+		if (validationErrors.value.length === 0) {
+			emit('input', jsonFields.value);
+		}
+		isHandlingValueUpdate.value = false;
+		isUpdating.value = false;
+	}, 300);
 }
 
 // Modify the watch function
@@ -226,21 +262,12 @@ function handleValueChange(newValue: any) {
 	clearFormData(); // Clear existing fields immediately
 }
 
-// Modify handleUpdate
-function handleUpdate(updatedFields: any[]) {
-	
-	if (!isInitialized.value) return;
-
-	isUpdating.value = true;
-	jsonFields.value = JSON.parse(JSON.stringify(updatedFields));
-	
-	clearTimeout(updateTimeout);
-	updateTimeout = setTimeout(() => {
-		isHandlingValueUpdate.value = true;
-		emit('input', jsonFields.value);
-		isHandlingValueUpdate.value = false;
-		isUpdating.value = false;
-	}, 300);
+// Add a function to clear form data
+function clearFormData() {
+	jsonFields.value = [];
+	isHandlingValueUpdate.value = true;
+	emit('input', null);
+	isHandlingValueUpdate.value = false;
 }
 
 // Add all other functions from the provided code...
