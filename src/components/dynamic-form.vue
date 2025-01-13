@@ -28,7 +28,6 @@ const validationErrors = ref<ValidationError[]>([]);
 
 // Convert fields to the format expected by v-form
 const fieldsWithNames = computed(() => {
-	console.log('🏗️ Building fields config');
 	
 	return props.fields.map((field) => ({
 		...field,
@@ -89,7 +88,6 @@ const formValues = computed(() => {
 });
 
 function handleFormUpdate(newValues: Record<string, any>) {
-	console.log('🔄 Form Update - New Values:', newValues);
 	
 	// Clear previous validation errors
 	validationErrors.value = [];
@@ -97,12 +95,6 @@ function handleFormUpdate(newValues: Record<string, any>) {
 	const updatedFields = props.fields.map(field => {
 		const newValue = newValues[field.field];
 		
-		console.log(`📝 Processing field: ${field.field}`, {
-			interface: field.meta?.interface,
-			type: field.meta?.type,
-			currentValue: field.value,
-			newValue,
-		});
 		
 		if (newValue === undefined) {
 			return field;
@@ -111,15 +103,12 @@ function handleFormUpdate(newValues: Record<string, any>) {
 		// Validate all fields for required
 		const error = validateField(field, newValue);
 		if (error) {
+
 			validationErrors.value.push(error);
 		}
 		
 		if (field.meta?.interface === 'datetime') {
-			console.log('⏰ DateTime field update:', {
-				field: field.field,
-				value: newValue,
-				type: field.meta.type
-			});
+
 			
 			if (field.meta.type === 'date' && newValue) {
 				return {
@@ -148,7 +137,8 @@ function handleFormUpdate(newValues: Record<string, any>) {
 		};
 	});
 	
-	// Emit validation status
+	
+	// Emit validation status first
 	emit('validation', validationErrors.value);
 	
 	// Only emit update if there are no validation errors

@@ -144,18 +144,21 @@ const validationErrors = ref<ValidationError[]>([]);
 // Handle validation from dynamic form
 function handleValidation(errors: ValidationError[]) {
 	if (errors.length > 0) {
-		// If there are validation errors, emit null to prevent saving
-		emit('input', null);
 		
-		// Store validation errors to show in the interface
-		validationErrors.value = errors.map(error => ({
-			...error,
-			field: props.field, // Map to the parent field
+		// Map the validation error to the parent field
+		const parentError: ValidationError = {
 			code: 'VALIDATION_FAILED',
-		}));
+			field: props.field,
+			type: 'validation',
+			message: errors.map(e => e.message).join(', ')
+		};
+
+		validationErrors.value = [parentError];
+		
+		// Emit null to prevent saving
+		emit('input', null);
 	} else {
 		validationErrors.value = [];
-		// Re-emit the current value if validation passes
 		emit('input', jsonFields.value);
 	}
 }
@@ -171,9 +174,7 @@ function handleUpdate(updatedFields: any[]) {
 	updateTimeout = setTimeout(() => {
 		isHandlingValueUpdate.value = true;
 		// Only emit input if there are no validation errors
-		if (validationErrors.value.length === 0) {
-			emit('input', jsonFields.value);
-		}
+		emit('input', jsonFields.value);
 		isHandlingValueUpdate.value = false;
 		isUpdating.value = false;
 	}, 300);
@@ -234,7 +235,6 @@ watch(
 					clearFormData();
 				}
 			} catch (err: any) {
-				console.error('Error fetching template JSON:', JSON.stringify(err, null, 2));
 				error.value = err.message;
 				clearFormData();
 			} finally {
