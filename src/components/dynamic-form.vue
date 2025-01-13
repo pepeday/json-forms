@@ -108,12 +108,10 @@ function handleFormUpdate(newValues: Record<string, any>) {
 			return field;
 		}
 		
-		// Validate input fields
-		if (field.meta?.interface === 'input') {
-			const error = validateField(field, newValue);
-			if (error) {
-				validationErrors.value.push(error);
-			}
+		// Validate all fields for required
+		const error = validateField(field, newValue);
+		if (error) {
+			validationErrors.value.push(error);
 		}
 		
 		if (field.meta?.interface === 'datetime') {
@@ -161,6 +159,17 @@ function handleFormUpdate(newValues: Record<string, any>) {
 
 // Add validation function
 function validateField(field: any, value: any): ValidationError | null {
+	// Check required fields first
+	if (field.meta?.required && (value === null || value === undefined || value === '')) {
+		return {
+			code: 'VALIDATION_FAILED',
+			field: field.field,
+			type: 'required',
+			message: `${field.name || field.field} is required`,
+		};
+	}
+
+	// Then check numeric constraints for input fields
 	if (field.meta?.interface === 'input' && ['integer', 'decimal'].includes(field.meta.type)) {
 		const numValue = Number(value);
 		
