@@ -3,41 +3,19 @@
 		<v-notice v-if="loading">Loading...</v-notice>
 		<v-notice v-else-if="error" type="danger">{{ error }}</v-notice>
 		<template v-else>
-			<!-- Relation field -->
-			<div class="field-list">
-				<v-field
-					:collection="props.collection"
-					:field="relationInfo?.relationField"
-					:type="relation?.meta?.interface || 'select-dropdown-m2o'"
-					:value="currentValue"
-					:disabled="false"
-					:name="relationInfo?.relationField"
-					:relation="relation"
-					:fields="[relationInfo?.jsonField]"
-					:validation-errors="validationErrors"
-					@input="handleValueChange"
-				>
-					<template #append>
-						<v-menu show-arrow placement="bottom-end">
-							<template #activator="{ toggle }">
-								<v-icon name="info" outline @click="toggle" />
-							</template>
-							<div class="related-info">
-								<div class="related-field">
-									{{ relationInfo?.jsonField }}
-								</div>
-							</div>
-						</v-menu>
-					</template>
-				</v-field>
-			</div>
-
+			<!-- Add debug info -->
+			<v-notice v-if="!jsonFields || jsonFields.length === 0" type="warning">
+				Debug: No fields available. jsonFields: {{ jsonFields }}, 
+				value: {{ value }}, 
+				initialized: {{ isInitialized }}
+			</v-notice>
+			
 			<!-- Dynamic form with validation -->
 			<dynamic-form
 				v-if="jsonFields && jsonFields.length > 0"
 				:fields="jsonFields"
 				:collection="collection"
-				:source-id="currentValue"
+				:validation-errors="validationErrors"
 				@update="handleUpdate"
 				@validation="handleValidation"
 			/>
@@ -49,11 +27,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, inject, type ComputedRef } from 'vue';
+import { ref, watch, inject, type ComputedRef } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useApi, useStores } from '@directus/extensions-sdk';
 import DynamicForm from './components/dynamic-form.vue';
-import { ValidationError } from '@directus/types';
+import type { ValidationError } from '@directus/types';
 
 const props = defineProps<{
 	collection: string;
@@ -61,218 +38,146 @@ const props = defineProps<{
 	field: string;
 	jsonField?: string[];
 	primaryKey: string | number | null;
+	validationErrors?: ValidationError[];
 }>();
 
-const emit = defineEmits(['input']);
+const emit = defineEmits(['input', 'validation']);
 const { t } = useI18n();
-const api = useApi();
-
-// Add stores
-const { useRelationsStore, useCollectionsStore } = useStores();
-const relationsStore = useRelationsStore();
-const collectionsStore = useCollectionsStore();
 
 const loading = ref(false);
 const error = ref<string | null>(null);
 const jsonFields = ref<any[]>([]);
-const currentValue = ref(props.value);
 
 // Get current form values including unsaved changes
 const values = inject<ComputedRef<Record<string, any>>>('values');
 
-// Get relation info using the stores
-const relationInfo = computed(() => {
-	if (!props.jsonField?.[0]) return null;
-	
-	const [relationField, jsonField] = props.jsonField[0].split('.');
-	
-	return {
-		relationField,
-		jsonField,
-		currentFormValue: values?.value?.[relationField]
-	};
-});
-
-// Get relation using the relationField from jsonField path
-const relation = computed(() => {
-	if (!relationInfo.value?.relationField) return null;
-	const rel = relationsStore.getRelationsForField(props.collection, relationInfo.value.relationField)?.[0];
-	return {
-		...rel,
-		meta: {
-			...(rel?.meta || {}),
-			interface: 'select-dropdown-m2o'
-		}
-	};
-});
-
-const relatedCollection = computed(() => {
-	if (!relation.value?.related_collection) return null;
-	return collectionsStore.getCollection(relation.value.related_collection);
-});
-
 // Add state management flags
 const isInitialized = ref(false);
-const isLoadingTemplate = ref(false);
 const isUpdating = ref(false);
 let updateTimeout: NodeJS.Timeout;
-
-// Add a flag to track if we're currently handling a value update
-const isHandlingValueUpdate = ref(false);
-
-// Add a ref to track the last fetched ID
-const lastFetchedId = ref<string | number | null>(null);
-
-// Add a computed to check if we have a local value
-const localJsonValue = computed(() => {
-	if (!values?.value || !props.field) return null;
-	// Get the JSON array from the local value
-	const localValue = values.value[props.field];
-
-	return Array.isArray(localValue) ? localValue : null;
-});
-
-// Add refs to track state
-const isInitialLoad = ref(true);
-const lastProcessedValue = ref<number | null>(null);
-const isRelationChange = ref(false);
-const hasLoadedLocalData = ref(false);
 
 // Add validation state
 const validationErrors = ref<ValidationError[]>([]);
 
 // Handle validation from dynamic form
-function handleValidation(errors: ValidationError[]) {
+const handleValidation = (errors: ValidationError[]) => {
+	console.log('🔍 Validation triggered with errors:', errors);
+	
 	if (errors.length > 0) {
-		
-		// Map the validation error to the parent field
-		const parentError: ValidationError = {
-			code: 'VALIDATION_FAILED',
-			field: props.field,
-			type: 'validation',
-			message: errors.map(e => e.message).join(', ')
-		};
+		// Map our field-specific errors to the parent field format
+		const mappedErrors = errors.map(error => ({
+			...error,
+			collection: props.collection,
+			field: error.field, // Keep the original field name for the dynamic form
+			parentField: `${props.field}(${error.field})`, // Store the parent field format separately
+		}));
 
-		validationErrors.value = [parentError];
+		// Set local validation state - use unmapped errors for the dynamic form
+		validationErrors.value = errors;
+		console.log('❌ Setting validation errors:', mappedErrors);
+
+		// Emit mapped errors to parent
+		emit('validation', mappedErrors);
 		
-		// Emit null to prevent saving
-		emit('input', null);
+		// Keep the current value
+		emit('input', jsonFields.value);
 	} else {
 		validationErrors.value = [];
+		console.log('✅ Validation passed, emitting fields:', jsonFields.value);
+		emit('validation', []);
 		emit('input', jsonFields.value);
 	}
-}
+};
 
-// Modify handleUpdate to work with validation
-function handleUpdate(updatedFields: any[]) {
+// Handle form updates
+const handleUpdate = (updatedFields: any[]) => {
+	console.log('🔄 Update triggered. Initialized:', isInitialized.value);
+	
 	if (!isInitialized.value) return;
 
+	console.log('📝 Previous fields:', jsonFields.value);
+	console.log('📝 Updated fields:', updatedFields);
+	
 	isUpdating.value = true;
 	jsonFields.value = JSON.parse(JSON.stringify(updatedFields));
 	
 	clearTimeout(updateTimeout);
 	updateTimeout = setTimeout(() => {
-		isHandlingValueUpdate.value = true;
-		// Only emit input if there are no validation errors
+		console.log('⏱️ Debounced update emitting:', jsonFields.value);
 		emit('input', jsonFields.value);
-		isHandlingValueUpdate.value = false;
 		isUpdating.value = false;
 	}, 300);
-}
+};
 
-// Modify the watch function
+// Watch for changes in the field value
 watch(
 	[() => values?.value, () => props.field],
-	async ([formValues, field]) => {
+	([formValues, field]) => {
+		console.log('👀 Watch triggered:', { 
+			formValues, 
+			field, 
+			isUpdating: isUpdating.value,
+			jsonFieldsProp: props.jsonField,
+			jsonFieldsRef: jsonFields.value
+		});
+		
+		if (!field || isUpdating.value) return;
 
+		const currentData = formValues?.[field];
+		console.log('📊 Current field data:', currentData);
 
-		// Skip if no relation info is available
-		if (!relationInfo.value) return;
-
-		// Skip if we're in the middle of updates
-		if (isUpdating.value || isLoadingTemplate.value || isHandlingValueUpdate.value) return;
-
-		const currentRelatedValue = formValues?.[relationInfo.value.relationField];
-		const localJsonData = formValues?.[field];
-
-		// First check for local data on initial load
-		if (!hasLoadedLocalData.value && Array.isArray(localJsonData) && localJsonData.length > 0) {
-			jsonFields.value = JSON.parse(JSON.stringify(localJsonData));
-			isHandlingValueUpdate.value = true;
-			emit('input', jsonFields.value);
-			isHandlingValueUpdate.value = false;
-			isInitialized.value = true;
-			lastProcessedValue.value = currentRelatedValue;
-			hasLoadedLocalData.value = true;
-			return;
-		}
-
-		// Then handle relation changes or initial relation selection
-		if ((currentRelatedValue !== lastProcessedValue.value || isRelationChange.value) && currentRelatedValue) {
-			lastProcessedValue.value = currentRelatedValue;
-			
-			try {
-				loading.value = true;
-				error.value = null;
-				isLoadingTemplate.value = true;
-
-				const response = await api.get(`/items/${relation.value?.related_collection}/${currentRelatedValue}`, {
-					params: {
-						fields: [relationInfo.value.jsonField]
-					}
-				});
-
-				const item = response.data.data;
-				const fields = item?.[relationInfo.value.jsonField];
-				
-				if (Array.isArray(fields) && fields.length > 0) {
-					jsonFields.value = JSON.parse(JSON.stringify(fields));
-					isHandlingValueUpdate.value = true;
-					emit('input', jsonFields.value);
-					isHandlingValueUpdate.value = false;
-					isInitialized.value = true;
-				} else {
-					clearFormData();
-				}
-			} catch (err: any) {
-				error.value = err.message;
-				clearFormData();
-			} finally {
-				loading.value = false;
-				isLoadingTemplate.value = false;
-				isInitialLoad.value = false;
-				isRelationChange.value = false;
+		// Only update if we have valid data or no data yet
+		if (Array.isArray(currentData) || !isInitialized.value) {
+			if (Array.isArray(currentData)) {
+				console.log('📝 Setting jsonFields with:', currentData);
+				jsonFields.value = JSON.parse(JSON.stringify(currentData));
+				isInitialized.value = true;
+				console.log('✨ Initialized with data:', jsonFields.value);
+			} else if (!isInitialized.value) {
+				console.log('🆕 Setting empty jsonFields');
+				jsonFields.value = [];
+				console.log('🗑️ Clearing fields - initial state');
+				emit('input', []);
+				isInitialized.value = true;
 			}
 		}
 	},
 	{ immediate: true }
 );
 
-// Modify handleValueChange
-function handleValueChange(newValue: any) {
+// Add immediate check of props
+watch(
+	() => props.value,
+	(newValue) => {
+		console.log('🔄 Value prop changed:', newValue);
+		if (Array.isArray(newValue) && !isUpdating.value) {
+			console.log('📝 Setting jsonFields from value prop:', newValue);
+			jsonFields.value = JSON.parse(JSON.stringify(newValue));
+			isInitialized.value = true;
+		}
+	},
+	{ immediate: true }
+);
 
-
-	const actualValue = typeof newValue === 'object' ? newValue?.id : newValue;
-	
-	currentValue.value = actualValue;
-	lastProcessedValue.value = null; // Reset to force reload
-	isRelationChange.value = true;
-	isInitialized.value = false;
-	error.value = null;
-	clearFormData(); // Clear existing fields immediately
-}
-
-// Add a function to clear form data
-function clearFormData() {
-	jsonFields.value = [];
-	isHandlingValueUpdate.value = true;
-	emit('input', null);
-	isHandlingValueUpdate.value = false;
-}
-
-// Add all other functions from the provided code...
-// (handleValueChange, etc.)
-
+// Watch for incoming validation errors from parent
+watch(
+	() => props.validationErrors,
+	(newErrors) => {
+		if (newErrors?.length) {
+			// Filter for only our field's errors and convert back to local format
+			const ourErrors = newErrors
+				.filter(error => error.field.startsWith(`${props.field}(`))
+				.map(error => ({
+					...error,
+					field: error.field.slice(props.field.length + 1, -1), // Remove parent field wrapper
+				}));
+			validationErrors.value = ourErrors;
+		} else {
+			validationErrors.value = [];
+		}
+	},
+	{ immediate: true }
+);
 </script>
 
 <style lang="scss" scoped>
@@ -282,18 +187,6 @@ function clearFormData() {
 	.empty {
 		color: var(--theme--form--field--input--foreground-subdued);
 		font-style: italic;
-	}
-
-	.field-list {
-		padding: var(--theme--form--field--input--padding) 0px;
-	}
-
-	.related-info {
-		padding: 8px;
-		.related-field {
-			font-family: monospace;
-			color: var(--theme--form--field--input--foreground-subdued);
-		}
 	}
 }
 </style>

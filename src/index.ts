@@ -9,23 +9,5 @@ export default defineInterface({
 	component: InterfaceComponent,
 	types: ['json'],
 	group: 'standard',
-	options: ({ collection }) => {
-		return [
-			{
-				field: 'jsonField',
-				name: '$t:field',
-				type: 'string',
-					meta: {
-						width: 'full',
-						interface: 'system-fields',
-						options: {
-							collectionName: collection,
-							typeAllowList: ['json'],
-							includeRelations: true,
-						},
-						required: true,
-					},
-			},
-		];
-	},
+	options: []
 });
