@@ -102,11 +102,12 @@ const handleUpdate = (updatedFields: any[]) => {
 
 // Watch for changes in the field value
 watch(
-	[() => values?.value, () => props.field],
-	([formValues, field]) => {
+	[() => values?.value, () => props.field, () => props.value],
+	([formValues, field, propValue]) => {
 		console.log('👀 Watch triggered:', { 
 			formValues, 
 			field, 
+			propValue,
 			isUpdating: isUpdating.value,
 			jsonFieldsProp: props.jsonField,
 			jsonFieldsRef: jsonFields.value
@@ -114,40 +115,46 @@ watch(
 		
 		if (!field || isUpdating.value) return;
 
+		// First check props.value as it takes precedence
+		if (propValue) {
+			try {
+				// Handle both string and array inputs
+				const parsedValue = typeof propValue === 'string' 
+					? JSON.parse(propValue)
+					: propValue;
+
+				if (Array.isArray(parsedValue)) {
+					console.log('📝 Setting jsonFields from prop value:', parsedValue);
+					jsonFields.value = JSON.parse(JSON.stringify(parsedValue));
+					isInitialized.value = true;
+					return; // Exit early as we've handled the update
+				}
+			} catch (e) {
+				console.warn('Failed to parse propValue:', e);
+			}
+		}
+
+		// Then check form values
 		const currentData = formValues?.[field];
 		console.log('📊 Current field data:', currentData);
 
-		// Only update if we have valid data or no data yet
-		if (Array.isArray(currentData) || !isInitialized.value) {
-			if (Array.isArray(currentData)) {
-				console.log('📝 Setting jsonFields with:', currentData);
-				jsonFields.value = JSON.parse(JSON.stringify(currentData));
-				isInitialized.value = true;
-				console.log('✨ Initialized with data:', jsonFields.value);
-			} else if (!isInitialized.value) {
-				console.log('🆕 Setting empty jsonFields');
-				jsonFields.value = [];
-				console.log('🗑️ Clearing fields - initial state');
-				emit('input', []);
-				isInitialized.value = true;
-			}
-		}
-	},
-	{ immediate: true }
-);
-
-// Add immediate check of props
-watch(
-	() => props.value,
-	(newValue) => {
-		console.log('🔄 Value prop changed:', newValue);
-		if (Array.isArray(newValue) && !isUpdating.value) {
-			console.log('📝 Setting jsonFields from value prop:', newValue);
-			jsonFields.value = JSON.parse(JSON.stringify(newValue));
+		// Only update if we have valid data or need initialization
+		if (Array.isArray(currentData)) {
+			console.log('📝 Setting jsonFields with form data:', currentData);
+			jsonFields.value = JSON.parse(JSON.stringify(currentData));
+			isInitialized.value = true;
+		} else if (!isInitialized.value || (!currentData && jsonFields.value.length === 0)) {
+			// Only set empty fields if not initialized or if we have no data
+			console.log('🆕 Setting empty jsonFields');
+			jsonFields.value = [];
+			emit('input', []);
 			isInitialized.value = true;
 		}
 	},
-	{ immediate: true }
+	{ 
+		immediate: true,
+		deep: true  // Add deep watching to catch nested changes
+	}
 );
 
 // Watch for incoming validation errors from parent
