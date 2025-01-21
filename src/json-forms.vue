@@ -61,29 +61,26 @@ const validationErrors = ref<ValidationError[]>([]);
 
 // Handle validation from dynamic form
 const handleValidation = (errors: ValidationError[]) => {
-	console.log('🔍 Validation triggered with errors:', errors);
-	
 	if (errors.length > 0) {
-		// Map our field-specific errors to the parent field format
-		const mappedErrors = errors.map(error => ({
-			...error,
+		// Format validation errors to match v-form expectations exactly
+		const consolidatedErrors = errors.map(error => ({
+			code: 'VALIDATION_FAILED',
 			collection: props.collection,
-			field: error.field, // Keep the original field name for the dynamic form
-			parentField: `${props.field}(${error.field})`, // Store the parent field format separately
+			field: `${props.field}(${error.field})`,  // Format: parentField(childField)
+			type: 'validation' as const,
+			message: error.message
 		}));
 
-		// Set local validation state - use unmapped errors for the dynamic form
-		validationErrors.value = errors;
-		console.log('❌ Setting validation errors:', mappedErrors);
+		console.log('🔍 Emitting validation errors:', JSON.stringify({
+			original: errors,
+			formatted: consolidatedErrors
+		}, null, 2));
 
-		// Emit mapped errors to parent
-		emit('validation', mappedErrors);
-		
-		// Keep the current value
-		emit('input', jsonFields.value);
+		validationErrors.value = errors;
+		emit('validation', consolidatedErrors);
+		emit('input', null);  // Prevent saving when validation fails
 	} else {
 		validationErrors.value = [];
-		console.log('✅ Validation passed, emitting fields:', jsonFields.value);
 		emit('validation', []);
 		emit('input', jsonFields.value);
 	}
@@ -91,20 +88,14 @@ const handleValidation = (errors: ValidationError[]) => {
 
 // Handle form updates
 const handleUpdate = (updatedFields: any[]) => {
-	console.log('🔄 Update triggered. Initialized:', isInitialized.value);
-	
 	if (!isInitialized.value) return;
-
-	console.log('📝 Previous fields:', jsonFields.value);
-	console.log('📝 Updated fields:', updatedFields);
 	
 	isUpdating.value = true;
 	jsonFields.value = JSON.parse(JSON.stringify(updatedFields));
 	
 	clearTimeout(updateTimeout);
 	updateTimeout = setTimeout(() => {
-		console.log('⏱️ Debounced update emitting:', jsonFields.value);
-		emit('input', jsonFields.value);
+		// Don't emit input here - let validation handler control it
 		isUpdating.value = false;
 	}, 300);
 };
@@ -163,13 +154,18 @@ watch(
 watch(
 	() => props.validationErrors,
 	(newErrors) => {
+		console.log('🔍 Parent Validation Update:', JSON.stringify({
+			receivedErrors: newErrors,
+			field: props.field,
+			filtered: newErrors?.filter(error => error.field.startsWith(`${props.field}(`))
+		}, null, 2));
+
 		if (newErrors?.length) {
-			// Filter for only our field's errors and convert back to local format
 			const ourErrors = newErrors
 				.filter(error => error.field.startsWith(`${props.field}(`))
 				.map(error => ({
 					...error,
-					field: error.field.slice(props.field.length + 1, -1), // Remove parent field wrapper
+					field: error.field.slice(props.field.length + 1, -1),
 				}));
 			validationErrors.value = ourErrors;
 		} else {

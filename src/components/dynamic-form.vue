@@ -88,99 +88,118 @@ const formValues = computed(() => {
 });
 
 function handleFormUpdate(newValues: Record<string, any>) {
-	
-	// Clear previous validation errors
 	validationErrors.value = [];
 	
 	const updatedFields = props.fields.map(field => {
 		const newValue = newValues[field.field];
+		let processedValue = newValue;
 		
-		
-		if (newValue === undefined) {
-			return field;
+		if (field.meta?.interface === 'input') {
+			if (newValue === '' || newValue === null || newValue === undefined) {
+				processedValue = null;
+			} else {
+				switch (field.meta.type) {
+					case 'integer':
+						processedValue = parseInt(newValue);
+						break;
+					case 'decimal':
+						processedValue = parseFloat(newValue);
+						break;
+					default:
+						processedValue = newValue;
+				}
+			}
+		} else if (field.meta?.interface === 'datetime') {
+			if (!newValue) {
+				processedValue = null;
+			} else if (field.meta.type === 'date' && newValue) {
+				processedValue = newValue.split('T')[0];
+			} else {
+				processedValue = newValue;
+			}
 		}
-		
-		// Validate all fields for required
-		const error = validateField(field, newValue);
-		if (error) {
 
+		const error = validateField(field, processedValue);
+		if (error) {
 			validationErrors.value.push(error);
 		}
-		
-		if (field.meta?.interface === 'datetime') {
 
-			
-			if (field.meta.type === 'date' && newValue) {
-				return {
-					...field,
-					value: newValue.split('T')[0]
-				};
-			}
-		} else if (field.meta?.interface === 'input') {
-			switch (field.meta.type) {
-				case 'integer':
-					return {
-						...field,
-						value: newValue !== null ? parseInt(newValue) : null
-					};
-				case 'decimal':
-					return {
-						...field,
-						value: newValue !== null ? parseFloat(newValue) : null
-					};
-			}
-		}
-		
 		return {
 			...field,
-			value: newValue,
+			value: processedValue,
 		};
 	});
-	
-	
-	// Emit validation status first
+
+	console.log('🔍 Dynamic Form Validation:', JSON.stringify({
+		validationErrors: validationErrors.value,
+		updatedFields: updatedFields.map(f => ({ field: f.field, value: f.value }))
+	}, null, 2));
+
+	emit('update', updatedFields);
 	emit('validation', validationErrors.value);
-	
-	// Only emit update if there are no validation errors
-	if (validationErrors.value.length === 0) {
-		emit('update', updatedFields);
-	}
 }
 
-// Add validation function
+// Handle field updates
+const handleFieldUpdate = (field: any, newValue: any) => {
+	console.log('🔄 Field update:', { field: field.field, value: newValue });
+	
+	// Update the field value regardless of validation
+	const updatedFields = props.fields.map(f => {
+		if (f.field === field.field) {
+			return { ...f, value: newValue };
+		}
+		return f;
+	});
+
+	// Run validation but don't block the update
+	const errors = updatedFields
+		.map(field => validateField(field, field.value))
+		.filter((error): error is ValidationError => error !== null);
+
+	// Emit validation status first
+	emit('validation', errors);
+	
+	// Always emit the update, even if there are validation errors
+	emit('update', updatedFields);
+};
+
+// Modify validation function to handle empty states better
 function validateField(field: any, value: any): ValidationError | null {
-	// Check required fields first
+	// Only validate required fields when trying to save
 	if (field.meta?.required && (value === null || value === undefined || value === '')) {
 		return {
 			code: 'VALIDATION_FAILED',
 			field: field.field,
-			type: 'required',
+			type: 'validation' as const,
 			message: `${field.name || field.field} is required`,
 		};
 	}
 
-	// Then check numeric constraints for input fields
-	if (field.meta?.interface === 'input' && ['integer', 'decimal'].includes(field.meta.type)) {
-		const numValue = Number(value);
-		
-		if (field.meta.options?.min !== undefined && numValue < field.meta.options.min) {
-			return {
-				code: 'VALIDATION_FAILED',
-				field: field.field,
-				type: 'min',
-				message: `Value must be greater than or equal to ${field.meta.options.min}`,
-			};
-		}
-		
-		if (field.meta.options?.max !== undefined && numValue > field.meta.options.max) {
-			return {
-				code: 'VALIDATION_FAILED',
-				field: field.field,
-				type: 'max',
-				message: `Value must be less than or equal to ${field.meta.options.max}`,
-			};
+	// Only validate constraints when there is a value
+	if (value !== null && value !== undefined && value !== '') {
+		if (field.meta?.interface === 'input' && ['integer', 'decimal'].includes(field.meta.type)) {
+			const numValue = Number(value);
+			
+			if (field.meta.options?.min !== undefined && numValue < field.meta.options.min) {
+				return {
+					code: 'VALIDATION_FAILED',
+					field: field.field,
+					type: 'validation' as const,
+					message: `Value must be greater than or equal to ${field.meta.options.min}`,
+				};
+			}
+			
+			if (field.meta.options?.max !== undefined && numValue > field.meta.options.max) {
+				return {
+					code: 'VALIDATION_FAILED',
+					field: field.field,
+					type: 'validation' as const,
+					message: `Value must be less than or equal to ${field.meta.options.max}`,
+				};
+			}
 		}
 	}
+
 	return null;
 }
 </script>
