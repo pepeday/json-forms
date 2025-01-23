@@ -3,12 +3,7 @@
 		<v-notice v-if="loading">Loading...</v-notice>
 		<v-notice v-else-if="error" type="danger">{{ error }}</v-notice>
 		<template v-else>
-			<!-- Add debug info -->
-			<v-notice v-if="!jsonFields || jsonFields.length === 0" type="warning">
-				Debug: No fields available. jsonFields: {{ jsonFields }}, 
-				value: {{ value }}, 
-				initialized: {{ isInitialized }}
-			</v-notice>
+
 			
 			<!-- Dynamic form with validation -->
 			<dynamic-form
@@ -71,10 +66,6 @@ const handleValidation = (errors: ValidationError[]) => {
 			message: error.message
 		}));
 
-		console.log('🔍 Emitting validation errors:', JSON.stringify({
-			original: errors,
-			formatted: consolidatedErrors
-		}, null, 2));
 
 		validationErrors.value = errors;
 		emit('validation', consolidatedErrors);
@@ -104,14 +95,7 @@ const handleUpdate = (updatedFields: any[]) => {
 watch(
 	[() => values?.value, () => props.field, () => props.value],
 	([formValues, field, propValue]) => {
-		console.log('👀 Watch triggered:', { 
-			formValues, 
-			field, 
-			propValue,
-			isUpdating: isUpdating.value,
-			jsonFieldsProp: props.jsonField,
-			jsonFieldsRef: jsonFields.value
-		});
+
 		
 		if (!field || isUpdating.value) return;
 
@@ -124,7 +108,6 @@ watch(
 					: propValue;
 
 				if (Array.isArray(parsedValue)) {
-					console.log('📝 Setting jsonFields from prop value:', parsedValue);
 					jsonFields.value = JSON.parse(JSON.stringify(parsedValue));
 					isInitialized.value = true;
 					return; // Exit early as we've handled the update
@@ -136,16 +119,13 @@ watch(
 
 		// Then check form values
 		const currentData = formValues?.[field];
-		console.log('📊 Current field data:', currentData);
 
 		// Only update if we have valid data or need initialization
 		if (Array.isArray(currentData)) {
-			console.log('📝 Setting jsonFields with form data:', currentData);
 			jsonFields.value = JSON.parse(JSON.stringify(currentData));
 			isInitialized.value = true;
 		} else if (!isInitialized.value || (!currentData && jsonFields.value.length === 0)) {
 			// Only set empty fields if not initialized or if we have no data
-			console.log('🆕 Setting empty jsonFields');
 			jsonFields.value = [];
 			emit('input', []);
 			isInitialized.value = true;
@@ -161,11 +141,6 @@ watch(
 watch(
 	() => props.validationErrors,
 	(newErrors) => {
-		console.log('🔍 Parent Validation Update:', JSON.stringify({
-			receivedErrors: newErrors,
-			field: props.field,
-			filtered: newErrors?.filter(error => error.field.startsWith(`${props.field}(`))
-		}, null, 2));
 
 		if (newErrors?.length) {
 			const ourErrors = newErrors
