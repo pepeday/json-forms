@@ -5,9 +5,10 @@
 		<template v-else>
 			<!-- Add debug info -->
 			<v-notice v-if="!jsonFields || jsonFields.length === 0" type="warning">
-				Debug: No fields available. jsonFields: {{ jsonFields }}, 
+				Debug: No fields available. 
+				jsonFields: {{ jsonFields }}, 
 				value: {{ value }}, 
-				initialized: {{ isInitialized }}
+				field value: {{ values?.value?.[field] }}
 			</v-notice>
 			
 			<!-- Dynamic form with validation -->
@@ -27,7 +28,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, inject, type ComputedRef } from 'vue';
+console.log('version 14');
+import { ref, watch, inject, type ComputedRef, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import DynamicForm from './components/dynamic-form.vue';
 import type { ValidationError } from '@directus/types';
@@ -47,38 +49,116 @@ const { t } = useI18n();
 const loading = ref(false);
 const error = ref<string | null>(null);
 const jsonFields = ref<any[]>([]);
-
-// Get current form values including unsaved changes
 const values = inject<ComputedRef<Record<string, any>>>('values');
-
-// Add state management flags
-const isInitialized = ref(false);
 const isUpdating = ref(false);
 let updateTimeout: NodeJS.Timeout;
 
 // Add validation state
 const validationErrors = ref<ValidationError[]>([]);
 
+// Add debug logging helper
+const logDebug = (location: string, data: any) => {
+	console.log(`🔍 [JsonForms ${location}]:`, data);
+};
+
+// Add helper to safely parse JSON string or return original value
+const parseJsonSafely = (value: any) => {
+	if (typeof value === 'string') {
+		try {
+			return JSON.parse(value);
+		} catch (e) {
+			return value;
+		}
+	}
+	return value;
+};
+
+// Add composable to track specific field value
+const useFieldValue = (values: ComputedRef<Record<string, any>> | undefined, fieldName: string) => {
+	// Create a ref to store the last known value
+	const lastValue = ref<any>(undefined);
+	
+	// Update function that only triggers when our specific field changes
+	const updateValue = () => {
+		const newValue = values?.value?.[fieldName];
+		if (JSON.stringify(lastValue.value) !== JSON.stringify(newValue)) {
+			lastValue.value = newValue;
+		}
+	};
+
+	// Watch only our field's path
+	if (values) {
+		watch(() => values.value?.[fieldName], updateValue, { immediate: true });
+	}
+
+	return lastValue;
+};
+
+// Use the composable instead of computed
+const fieldValue = useFieldValue(values, props.field);
+
+// Initialize form data
+onMounted(() => {
+	logDebug('onMounted', {
+		fieldValue: parseJsonSafely(fieldValue.value),
+		propValue: parseJsonSafely(props.value)
+	});
+
+	const initialData = parseJsonSafely(fieldValue.value) ?? parseJsonSafely(props.value);
+	if (Array.isArray(initialData)) {
+		jsonFields.value = JSON.parse(JSON.stringify(initialData));
+	} else {
+		jsonFields.value = [];
+		emit('input', []);
+	}
+});
+
+// Watch only our specific field value
+watch(
+	() => parseJsonSafely(fieldValue.value),
+	(newValue) => {
+		logDebug('field watch', {
+			newValue,
+			isUpdating: isUpdating.value,
+			currentFields: jsonFields.value
+		});
+
+		if (!isUpdating.value && Array.isArray(newValue)) {
+			jsonFields.value = JSON.parse(JSON.stringify(newValue));
+		}
+	}
+);
+
+// Watch for direct prop changes (e.g., from dropdown)
+watch(
+	() => parseJsonSafely(props.value),
+	(newValue) => {
+		logDebug('props.value watch', {
+			newValue,
+			isUpdating: isUpdating.value,
+			currentFields: jsonFields.value
+		});
+
+		if (!isUpdating.value && Array.isArray(newValue)) {
+			jsonFields.value = JSON.parse(JSON.stringify(newValue));
+		}
+	}
+);
+
 // Handle validation from dynamic form
 const handleValidation = (errors: ValidationError[]) => {
 	if (errors.length > 0) {
-		// Format validation errors to match v-form expectations exactly
 		const consolidatedErrors = errors.map(error => ({
 			code: 'VALIDATION_FAILED',
 			collection: props.collection,
-			field: `${props.field}(${error.field})`,  // Format: parentField(childField)
+			field: `${props.field}(${error.field})`,
 			type: 'validation' as const,
 			message: error.message
 		}));
 
-		console.log('🔍 Emitting validation errors:', JSON.stringify({
-			original: errors,
-			formatted: consolidatedErrors
-		}, null, 2));
-
 		validationErrors.value = errors;
 		emit('validation', consolidatedErrors);
-		emit('input', null);  // Prevent saving when validation fails
+		emit('input', null);
 	} else {
 		validationErrors.value = [];
 		emit('validation', []);
@@ -88,78 +168,19 @@ const handleValidation = (errors: ValidationError[]) => {
 
 // Handle form updates
 const handleUpdate = (updatedFields: any[]) => {
-	if (!isInitialized.value) return;
-	
 	isUpdating.value = true;
 	jsonFields.value = JSON.parse(JSON.stringify(updatedFields));
 	
 	clearTimeout(updateTimeout);
 	updateTimeout = setTimeout(() => {
-		// Don't emit input here - let validation handler control it
 		isUpdating.value = false;
 	}, 300);
 };
-
-// Watch for changes in the field value
-watch(
-	[() => values?.value, () => props.field],
-	([formValues, field]) => {
-		console.log('👀 Watch triggered:', { 
-			formValues, 
-			field, 
-			isUpdating: isUpdating.value,
-			jsonFieldsProp: props.jsonField,
-			jsonFieldsRef: jsonFields.value
-		});
-		
-		if (!field || isUpdating.value) return;
-
-		const currentData = formValues?.[field];
-		console.log('📊 Current field data:', currentData);
-
-		// Only update if we have valid data or no data yet
-		if (Array.isArray(currentData) || !isInitialized.value) {
-			if (Array.isArray(currentData)) {
-				console.log('📝 Setting jsonFields with:', currentData);
-				jsonFields.value = JSON.parse(JSON.stringify(currentData));
-				isInitialized.value = true;
-				console.log('✨ Initialized with data:', jsonFields.value);
-			} else if (!isInitialized.value) {
-				console.log('🆕 Setting empty jsonFields');
-				jsonFields.value = [];
-				console.log('🗑️ Clearing fields - initial state');
-				emit('input', []);
-				isInitialized.value = true;
-			}
-		}
-	},
-	{ immediate: true }
-);
-
-// Add immediate check of props
-watch(
-	() => props.value,
-	(newValue) => {
-		console.log('🔄 Value prop changed:', newValue);
-		if (Array.isArray(newValue) && !isUpdating.value) {
-			console.log('📝 Setting jsonFields from value prop:', newValue);
-			jsonFields.value = JSON.parse(JSON.stringify(newValue));
-			isInitialized.value = true;
-		}
-	},
-	{ immediate: true }
-);
 
 // Watch for incoming validation errors from parent
 watch(
 	() => props.validationErrors,
 	(newErrors) => {
-		console.log('🔍 Parent Validation Update:', JSON.stringify({
-			receivedErrors: newErrors,
-			field: props.field,
-			filtered: newErrors?.filter(error => error.field.startsWith(`${props.field}(`))
-		}, null, 2));
-
 		if (newErrors?.length) {
 			const ourErrors = newErrors
 				.filter(error => error.field.startsWith(`${props.field}(`))
