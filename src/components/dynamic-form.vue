@@ -130,10 +130,6 @@ function handleFormUpdate(newValues: Record<string, any>) {
 		};
 	});
 
-	console.log('🔍 Dynamic Form Validation:', JSON.stringify({
-		validationErrors: validationErrors.value,
-		updatedFields: updatedFields.map(f => ({ field: f.field, value: f.value }))
-	}, null, 2));
 
 	emit('update', updatedFields);
 	emit('validation', validationErrors.value);
@@ -141,7 +137,6 @@ function handleFormUpdate(newValues: Record<string, any>) {
 
 // Handle field updates
 const handleFieldUpdate = (field: any, newValue: any) => {
-	console.log('🔄 Field update:', { field: field.field, value: newValue });
 	
 	// Update the field value regardless of validation
 	const updatedFields = props.fields.map(f => {
