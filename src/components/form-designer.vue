@@ -74,6 +74,24 @@
             class="field-third"
           />
         </div>
+
+        <!-- Date and time specific options -->
+        <div v-if="fieldData.meta.interface === 'datetime'" class="field-row">
+          <v-select
+            v-model="fieldData.meta.type"
+            :items="[
+              { text: 'Date & Time', value: 'timestamp' },
+              { text: 'Date Only', value: 'date' }
+            ]"
+            placeholder="Date Type"
+            class="field-half"
+          />
+          <v-checkbox
+            v-model="fieldData.meta.required"
+            label="Required"
+            class="field-half"
+          />
+        </div>
       </div>
     </v-card-text>
 
@@ -126,6 +144,18 @@ const inputTypes = [
 function save() {
   emit('update:field', JSON.parse(JSON.stringify(fieldData.value)));
 }
+
+// Watch for interface changes
+watch(() => fieldData.value.meta.interface, (newInterface) => {
+  if (newInterface === 'datetime') {
+    // Set defaults for datetime interface
+    fieldData.value.meta.type = 'timestamp';
+    fieldData.value.meta.options = {
+      mode: 'datetime',
+      use24: true
+    };
+  }
+});
 </script>
 
 <style lang="scss" scoped>

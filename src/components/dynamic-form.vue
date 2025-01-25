@@ -57,7 +57,6 @@ const validationErrors = ref<ValidationError[]>([]);
 
 // Convert fields to the format expected by v-form
 const fieldsWithNames = computed(() => {
-	
 	return props.fields.map((field) => ({
 		...field,
 		collection: props.collection,
@@ -81,14 +80,12 @@ const fieldsWithNames = computed(() => {
 			}),
 			...(field.meta?.interface === 'datetime' && {
 				type: field.meta.type || 'timestamp',
-				mode: field.meta.options?.mode || 'datetime',
-				includeSeconds: field.meta.options?.includeSeconds || false,
-				use24: field.meta.options?.use24 ?? true
+				mode: 'datetime',
+				use24: true
 			}),
 		},
 		type: field.meta?.type || (
-			field.meta?.interface === 'datetime' ? 'timestamp' : 
-			field.meta?.interface === 'input' ? 'string' : 'string'
+			field.meta?.interface === 'datetime' ? 'timestamp' : 'string'
 		),
 	}));
 });
@@ -117,51 +114,29 @@ const formValues = computed(() => {
 });
 
 function handleFormUpdate(newValues: Record<string, any>) {
-	validationErrors.value = [];
-	
 	const updatedFields = props.fields.map(field => {
 		const newValue = newValues[field.field];
 		let processedValue = newValue;
-		
-		if (field.meta?.interface === 'input') {
-			if (newValue === '' || newValue === null || newValue === undefined) {
-				processedValue = null;
-			} else {
-				switch (field.meta.type) {
-					case 'integer':
-						processedValue = parseInt(newValue);
-						break;
-					case 'decimal':
-						processedValue = parseFloat(newValue);
-						break;
-					default:
-						processedValue = newValue;
-				}
-			}
-		} else if (field.meta?.interface === 'datetime') {
+
+		if (field.meta?.interface === 'datetime') {
 			if (!newValue) {
 				processedValue = null;
-			} else if (field.meta.type === 'date' && newValue) {
+			} else if (field.meta.type === 'date') {
+				// For date-only fields, strip the time component
 				processedValue = newValue.split('T')[0];
 			} else {
+				// For datetime fields, keep the full timestamp
 				processedValue = newValue;
 			}
 		}
 
-		const error = validateField(field, processedValue);
-		if (error) {
-			validationErrors.value.push(error);
-		}
-
 		return {
 			...field,
-			value: processedValue,
+			value: processedValue
 		};
 	});
 
-
 	emit('update', updatedFields);
-	emit('validation', validationErrors.value);
 }
 
 // Handle field updates
