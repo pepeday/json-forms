@@ -1,32 +1,40 @@
 <template>
-	<v-button small class="toggle-mode" @click="isDesignMode = !isDesignMode">
-		<v-icon :name="isDesignMode ? 'visibility' : 'edit'" />
-		{{ isDesignMode ? t('preview_form') : t('edit_form') }}
-	</v-button>
+
 
 	<!-- Form Designer Mode -->
-	<form-designer v-if="isDesignMode" :fields="jsonFields" @update:fields="handleDesignerUpdate" />
 	<div v-if="props.jsonField" class="json-form-interface">
 		<v-notice v-if="loading">Loading...</v-notice>
 		<v-notice v-else-if="error" type="danger">{{ error }}</v-notice>
 		<template v-else>
-			<!-- Add mode toggle -->
-
-
-
-
-			<!-- Form Preview/Use Mode -->
-			<dynamic-form v-if="jsonFields && jsonFields.length > 0 && !isDesignMode" :fields="jsonFields" :collection="collection"
-				:validation-errors="validationErrors" @update="handleUpdate" @validation="handleValidation" />
-			<v-notice v-else type="info">
-				{{ t('no_form_available') }}
-			</v-notice>
+			<dynamic-form 
+				:fields="jsonFields" 
+				:collection="collection"
+				:validation-errors="validationErrors" 
+				@update="handleUpdate" 
+				@validation="handleValidation"
+				@edit-field="openFieldDialog"
+				@remove-field="removeField"
+				@add-field="openFieldDialog()"
+			/>
 		</template>
 	</div>
+
+	<!-- Field Edit Dialog -->
+	<v-dialog v-model="showFieldDialog" @esc="closeFieldDialog">
+		<v-card>
+			<v-card-title>{{ editingField ? 'Edit Field' : 'Add Field' }}</v-card-title>
+			<form-designer 
+				v-if="showFieldDialog"
+				:field="editingField || getEmptyField()"
+				@update:field="saveField"
+				@cancel="closeFieldDialog"
+			/>
+		</v-card>
+	</v-dialog>
 </template>
 
 <script setup lang="ts">
-console.log('version 16');
+console.log('version 19');
 import { ref, watch, inject, type ComputedRef, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import DynamicForm from './components/dynamic-form.vue';
@@ -203,6 +211,52 @@ watch(
 const handleDesignerUpdate = (updatedFields: any[]) => {
 	handleUpdate(updatedFields);
 };
+
+const showFieldDialog = ref(false);
+const editingField = ref<any>(null);
+
+function getEmptyField() {
+	return {
+		field: '',
+		name: '',
+		meta: {
+			interface: 'input',
+			type: 'string',
+			width: 'full',
+			options: {}
+		},
+		value: null
+	};
+}
+
+function openFieldDialog(field?: any) {
+	editingField.value = field ? JSON.parse(JSON.stringify(field)) : null;
+	showFieldDialog.value = true;
+}
+
+function closeFieldDialog() {
+	showFieldDialog.value = false;
+	editingField.value = null;
+}
+
+function saveField(field: any) {
+	const newFields = [...jsonFields.value];
+	const existingIndex = newFields.findIndex(f => f.field === field.field);
+	
+	if (existingIndex >= 0) {
+		newFields[existingIndex] = field;
+	} else {
+		newFields.push(field);
+	}
+	
+	handleUpdate(newFields);
+	closeFieldDialog();
+}
+
+function removeField(field: any) {
+	const newFields = jsonFields.value.filter(f => f.field !== field.field);
+	handleUpdate(newFields);
+}
 </script>
 
 <style lang="scss" scoped>

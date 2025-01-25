@@ -1,14 +1,43 @@
 <template>
 	<div class="dynamic-fields">
-		<v-form
-			:key="`form-${sourceId}-${fields.length}`"
-			:fields="fieldsWithNames"
-			:model-value="formValues"
-			:primary-key="'+'"
-			:autofocus="false"
-			:validation-errors="validationErrors"
-			@update:model-value="handleFormUpdate"
-		/>
+		<!-- Fields with controls -->
+		<div v-for="field in fieldsWithNames" :key="field.field" class="field-container">
+			<div class="field-controls">
+				<v-button
+					v-tooltip="'Edit Field'"
+					x-small
+					icon
+					@click="$emit('edit-field', field)"
+				>
+					<v-icon name="edit" />
+				</v-button>
+				<v-button
+					v-tooltip="'Remove Field'"
+					x-small
+					icon
+					class="delete"
+					@click="$emit('remove-field', field)"
+				>
+					<v-icon name="delete" />
+				</v-button>
+			</div>
+
+			<!-- Actual form field -->
+			<v-form
+				:fields="[field]"
+				:model-value="formValues"
+				:primary-key="'+'"
+				:autofocus="false"
+				:validation-errors="validationErrors"
+				@update:model-value="handleFormUpdate"
+			/>
+		</div>
+
+		<!-- Add Field button -->
+		<v-button small @click="$emit('add-field')" class="add-field">
+			<v-icon name="add" />
+			Add Field
+		</v-button>
 	</div>
 </template>
 
@@ -22,7 +51,7 @@ const props = defineProps<{
 	sourceId?: string | number;
 }>();
 
-const emit = defineEmits(['update', 'validation']);
+const emit = defineEmits(['update', 'validation', 'edit-field', 'remove-field', 'add-field']);
 
 const validationErrors = ref<ValidationError[]>([]);
 
@@ -201,21 +230,45 @@ function validateField(field: any, value: any): ValidationError | null {
 
 <style lang="scss" scoped>
 .dynamic-fields {
-	.field-wrapper {
-		margin-bottom: 12px;
-		
-		&.half {
-			width: calc(50% - 8px);
-			display: inline-block;
-			
-			&:nth-child(odd) {
-				margin-right: 16px;
-			}
+	.field-container {
+		position: relative;
+		margin-bottom: 20px;
+
+		.field-controls {
+			position: absolute;
+			top: -8px;
+			right: -8px;
+			display: flex;
+			gap: 4px;
+			opacity: 0;
+			transition: opacity var(--fast) var(--transition);
+			z-index: 1;
+			background: var(--theme--background);
+			padding: 4px;
+			border-radius: var(--theme--border-radius);
 		}
-		
-		&.full {
-			width: 100%;
+
+		&:hover .field-controls {
+			opacity: 1;
 		}
+	}
+
+	.field-actions {
+		margin-top: 20px;
+		display: flex;
+		justify-content: flex-end;
+	}
+
+	.delete {
+		--v-button-color: var(--theme--danger);
+		--v-button-background-color: var(--theme--danger-10);
+		--v-button-background-color-hover: var(--theme--danger-25);
+	}
+
+	.add-field {
+		--v-button-color: var(--theme--primary);
+		--v-button-background-color: var(--theme--primary-10);
+		--v-button-background-color-hover: var(--theme--primary-25);
 	}
 }
 </style> 
