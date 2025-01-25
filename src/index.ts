@@ -9,5 +9,15 @@ export default defineInterface({
 	component: InterfaceComponent,
 	types: ['json'],
 	group: 'standard',
-	options: []
+	options:  [
+			{
+				field: 'enableDesigner',
+				name: 'Enable Designer',
+				type: 'boolean',
+				meta: {
+					width: 'full',
+					interface: 'system-boolean',
+				},
+			},
+		]
 });
