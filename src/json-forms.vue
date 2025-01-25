@@ -1,25 +1,23 @@
 <template>
+	<v-button small class="toggle-mode" @click="isDesignMode = !isDesignMode">
+		<v-icon :name="isDesignMode ? 'visibility' : 'edit'" />
+		{{ isDesignMode ? t('preview_form') : t('edit_form') }}
+	</v-button>
+
+	<!-- Form Designer Mode -->
+	<form-designer v-if="isDesignMode" :fields="jsonFields" @update:fields="handleDesignerUpdate" />
 	<div v-if="props.jsonField" class="json-form-interface">
 		<v-notice v-if="loading">Loading...</v-notice>
 		<v-notice v-else-if="error" type="danger">{{ error }}</v-notice>
 		<template v-else>
-			<!-- Add debug info -->
-			<v-notice v-if="!jsonFields || jsonFields.length === 0" type="warning">
-				Debug: No fields available. 
-				jsonFields: {{ jsonFields }}, 
-				value: {{ value }}, 
-				field value: {{ values?.value?.[field] }}
-			</v-notice>
-			
-			<!-- Dynamic form with validation -->
-			<dynamic-form
-				v-if="jsonFields && jsonFields.length > 0"
-				:fields="jsonFields"
-				:collection="collection"
-				:validation-errors="validationErrors"
-				@update="handleUpdate"
-				@validation="handleValidation"
-			/>
+			<!-- Add mode toggle -->
+
+
+
+
+			<!-- Form Preview/Use Mode -->
+			<dynamic-form v-if="jsonFields && jsonFields.length > 0 && !isDesignMode" :fields="jsonFields" :collection="collection"
+				:validation-errors="validationErrors" @update="handleUpdate" @validation="handleValidation" />
 			<v-notice v-else type="info">
 				{{ t('no_form_available') }}
 			</v-notice>
@@ -28,10 +26,11 @@
 </template>
 
 <script setup lang="ts">
-console.log('version 14');
+console.log('version 16');
 import { ref, watch, inject, type ComputedRef, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import DynamicForm from './components/dynamic-form.vue';
+import FormDesigner from './components/form-designer.vue';
 import type { ValidationError } from '@directus/types';
 
 const props = defineProps<{
@@ -56,6 +55,10 @@ let updateTimeout: NodeJS.Timeout;
 // Add validation state
 const validationErrors = ref<ValidationError[]>([]);
 
+// Add isDesignMode state
+const isDesignMode = ref(false);
+const disabled = computed(() => props.primaryKey != null);
+
 // Add debug logging helper
 const logDebug = (location: string, data: any) => {
 	console.log(`🔍 [JsonForms ${location}]:`, data);
@@ -77,7 +80,7 @@ const parseJsonSafely = (value: any) => {
 const useFieldValue = (values: ComputedRef<Record<string, any>> | undefined, fieldName: string) => {
 	// Create a ref to store the last known value
 	const lastValue = ref<any>(undefined);
-	
+
 	// Update function that only triggers when our specific field changes
 	const updateValue = () => {
 		const newValue = values?.value?.[fieldName];
@@ -170,7 +173,7 @@ const handleValidation = (errors: ValidationError[]) => {
 const handleUpdate = (updatedFields: any[]) => {
 	isUpdating.value = true;
 	jsonFields.value = JSON.parse(JSON.stringify(updatedFields));
-	
+
 	clearTimeout(updateTimeout);
 	updateTimeout = setTimeout(() => {
 		isUpdating.value = false;
@@ -195,15 +198,24 @@ watch(
 	},
 	{ immediate: true }
 );
+
+// Add handler for designer updates
+const handleDesignerUpdate = (updatedFields: any[]) => {
+	handleUpdate(updatedFields);
+};
 </script>
 
 <style lang="scss" scoped>
 .json-form-interface {
 	width: 100%;
-	
+
 	.empty {
 		color: var(--theme--form--field--input--foreground-subdued);
 		font-style: italic;
+	}
+
+	.toggle-mode {
+		margin-bottom: 20px;
 	}
 }
 </style>
