@@ -7,8 +7,18 @@
           <v-input
             v-model="fieldData.field"
             placeholder="Field ID"
-            class="field-half"
-          />
+            :class="{ 'field-half': true, 'has-error': hasFieldError }"
+            required
+          >
+            <template #append>
+              <v-icon 
+                v-if="!fieldData.field" 
+                name="error" 
+                class="error-icon" 
+                v-tooltip="'Field ID is required'"
+              />
+            </template>
+          </v-input>
           <v-input
             v-model="fieldData.name"
             placeholder="Display Name"
@@ -92,6 +102,13 @@
             class="field-half"
           />
         </div>
+
+        <v-notice
+          v-if="fieldError"
+          type="danger"
+        >
+          {{ fieldError }}
+        </v-notice>
       </div>
     </v-card-text>
 
@@ -103,17 +120,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 
 const props = defineProps<{
   field?: any; // Optional - if provided, we're editing an existing field
+  existingFields?: any[]; // Add this prop to check uniqueness
 }>();
 
 const emit = defineEmits(['update:field', 'cancel']);
 
-// Initialize field data from prop or create new
 const fieldData = ref(props.field ? JSON.parse(JSON.stringify(props.field)) : {
-  field: '',
+  field: generateUniqueId(),  // Auto-generate for new fields
   name: '',
   meta: {
     interface: 'input',
@@ -123,6 +140,9 @@ const fieldData = ref(props.field ? JSON.parse(JSON.stringify(props.field)) : {
   },
   value: null
 });
+
+const fieldError = ref('');
+const hasFieldError = computed(() => !!fieldError.value);
 
 // Available options
 const availableInterfaces = [
@@ -140,8 +160,36 @@ const inputTypes = [
   { text: 'Multiline Text', value: 'text' }
 ];
 
+// Generate unique ID like field_1234
+function generateUniqueId() {
+  const timestamp = Date.now();
+  return `field_${timestamp}`;
+}
+
+// Validate field ID
+function validateFieldId(): boolean {
+  if (!fieldData.value.field) {
+    fieldError.value = 'Field ID is required';
+    return false;
+  }
+
+  const existingField = props.existingFields?.find(
+    f => f.field === fieldData.value.field && f !== props.field
+  );
+
+  if (existingField) {
+    const suggestion = `${fieldData.value.field}_${Date.now()}`;
+    fieldError.value = `This ID is already used. Try: ${suggestion}`;
+    return false;
+  }
+
+  fieldError.value = '';
+  return true;
+}
+
 // Save the configured field
 function save() {
+  if (!validateFieldId()) return;
   emit('update:field', JSON.parse(JSON.stringify(fieldData.value)));
 }
 
@@ -179,5 +227,9 @@ watch(() => fieldData.value.meta.interface, (newInterface) => {
 
 .field-full {
   width: 100%;
+}
+
+.error-icon {
+  color: red;
 }
 </style>

@@ -15,6 +15,7 @@
 				@edit-field="openFieldDialog"
 				@remove-field="removeField"
 				@add-field="openFieldDialog()"
+				:enableEditor="props.enableEditor"
 			/>
 		</template>
 	</div>
@@ -34,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-console.log('version 19');
+console.log('version 22');
 import { ref, watch, inject, type ComputedRef, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import DynamicForm from './components/dynamic-form.vue';
@@ -48,6 +49,7 @@ const props = defineProps<{
 	jsonField?: string[];
 	primaryKey: string | number | null;
 	validationErrors?: ValidationError[];
+	enableEditor: boolean;
 }>();
 
 const emit = defineEmits(['input', 'validation']);
@@ -64,8 +66,7 @@ let updateTimeout: NodeJS.Timeout;
 const validationErrors = ref<ValidationError[]>([]);
 
 // Add isDesignMode state
-const isDesignMode = ref(false);
-const disabled = computed(() => props.primaryKey != null);
+const disabled = computed(() => props.primaryKey != null); //need to fix this?
 
 // Add debug logging helper
 const logDebug = (location: string, data: any) => {

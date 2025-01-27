@@ -1,70 +1,107 @@
 <template>
-	<div class="dynamic-fields">
-		<!-- Fields with controls -->
-		<div v-for="field in fieldsWithNames" :key="field.field" class="field-container">
-			<div class="field-controls">
-				<v-button
-					v-tooltip="'Edit Field'"
-					x-small
-					icon
-					@click="$emit('edit-field', field)"
-				>
-					<v-icon name="edit" />
-				</v-button>
-				<v-button
-					v-tooltip="'Remove Field'"
-					x-small
-					icon
-					class="delete"
-					@click="$emit('remove-field', field)"
-				>
-					<v-icon name="delete" />
-				</v-button>
+	<div class="fields-wrapper">
+		<div class="fields-list">
+			<!-- Preview Mode -->
+			<v-form v-if="!editMode" :fields="fieldsWithNames" :model-value="formValues" :primary-key="'+'"
+				:autofocus="false" :validation-errors="validationErrors" @update:model-value="handleFormUpdate" />
+
+			<!-- Edit Mode -->
+			<div v-else>
+				<div class="fields-grid">
+					<v-list-item 
+						v-for="(field, index) in fieldsWithNames" 
+						:key="field.field"
+						v-tooltip="'Click to edit'"
+						clickable
+						block
+						class="link"
+						:class="{ 'half-width': field.meta?.width === 'half' }"
+						@click="handleEditField(field)"
+					>
+						<v-list-item-content>
+							<div class="field-info">
+								<span class="field-name">
+									{{ field.name }}
+									<v-icon 
+										v-if="field.meta?.required" 
+										class="required"
+										sup
+										name="star"
+										filled
+									/>
+								</span>
+								<span class="field-details">{{ field.field }} ({{ field.meta.interface }})</span>
+							</div>
+						</v-list-item-content>
+
+						<v-list-item-action class="action-buttons">
+							<v-icon 
+								name="arrow_upward" 
+								clickable 
+								:disabled="index === 0"
+								@click.stop.prevent="moveField(index, 'up')" 
+							/>
+							<v-icon 
+								name="arrow_downward" 
+								clickable 
+								:disabled="index === fieldsWithNames.length - 1"
+								@click.stop.prevent="moveField(index, 'down')" 
+							/>
+							<v-icon 
+								name="delete" 
+								clickable 
+								class="delete-icon"
+								v-tooltip="'Remove Field'"
+								@click.stop="handleRemoveField(field)" 
+							/>
+						</v-list-item-action>
+					</v-list-item>
+				</div>
+
 			</div>
 
-			<!-- Actual form field -->
-			<v-form
-				:fields="[field]"
-				:model-value="formValues"
-				:primary-key="'+'"
-				:autofocus="false"
-				:validation-errors="validationErrors"
-				@update:model-value="handleFormUpdate"
-			/>
+			<div v-if="enableEditor" class="button-group">
+					<v-button small @click="editMode = !editMode">
+						{{ editMode ? t('preview') : t('edit') }}
+					</v-button>
+					<v-button small @click="$emit('add-field')">
+						{{ t('add_field') }}
+					</v-button>
+				</div>
 		</div>
-
-		<!-- Add Field button -->
-		<v-button small @click="$emit('add-field')" class="add-field">
-			<v-icon name="add" />
-			Add Field
-		</v-button>
 	</div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { Field, ValidationError } from '@directus/types';
+import { useI18n } from 'vue-i18n';
+import { ValidationError } from '@directus/types';
+// import Draggable from 'vuedraggable';
+
+const { t } = useI18n();
 
 const props = defineProps<{
 	fields: any[];
-	collection: string;
 	sourceId?: string | number;
+	enableEditor: boolean;
 }>();
+
+console.log('enableEditor', props.enableEditor);
 
 const emit = defineEmits(['update', 'validation', 'edit-field', 'remove-field', 'add-field']);
 
 const validationErrors = ref<ValidationError[]>([]);
 
+const editMode = ref(false);
+
 // Convert fields to the format expected by v-form
 const fieldsWithNames = computed(() => {
 	return props.fields.map((field) => ({
 		...field,
-		collection: props.collection,
 		schema: null,
 		meta: {
 			...field.meta,
 			field: field.field,
-			collection: props.collection,
 			...(field.meta?.interface === 'input' && {
 				type: field.meta.type || 'string',
 				...(field.meta.type === 'decimal' && {
@@ -113,7 +150,9 @@ const formValues = computed(() => {
 	return values;
 });
 
+// Emit proper update events
 function handleFormUpdate(newValues: Record<string, any>) {
+	console.log('🔵 Form update:', newValues);
 	const updatedFields = props.fields.map(field => {
 		const newValue = newValues[field.field];
 		let processedValue = newValue;
@@ -122,10 +161,8 @@ function handleFormUpdate(newValues: Record<string, any>) {
 			if (!newValue) {
 				processedValue = null;
 			} else if (field.meta.type === 'date') {
-				// For date-only fields, strip the time component
 				processedValue = newValue.split('T')[0];
 			} else {
-				// For datetime fields, keep the full timestamp
 				processedValue = newValue;
 			}
 		}
@@ -139,9 +176,33 @@ function handleFormUpdate(newValues: Record<string, any>) {
 	emit('update', updatedFields);
 }
 
+// Update field order
+function moveField(index: number, direction: 'up' | 'down') {
+	const newFields = [...props.fields]; // Use props.fields instead of computed
+	const newIndex = direction === 'up' ? index - 1 : index + 1;
+	
+	[newFields[index], newFields[newIndex]] = [newFields[newIndex], newFields[index]];
+	
+	console.log('🔵 Reordering fields:', newFields);
+	emit('update', newFields);
+}
+
+// Handle field removal
+const handleRemoveField = (field: any) => {
+	const updatedFields = props.fields.filter(f => f.field !== field.field);
+	console.log('🔵 Removing field:', field.field);
+	emit('update', updatedFields);
+};
+
+// Handle field edit
+const handleEditField = (field: any) => {
+	console.log('🔵 Editing field:', field);
+	emit('edit-field', field);
+};
+
 // Handle field updates
 const handleFieldUpdate = (field: any, newValue: any) => {
-	
+
 	// Update the field value regardless of validation
 	const updatedFields = props.fields.map(f => {
 		if (f.field === field.field) {
@@ -157,7 +218,7 @@ const handleFieldUpdate = (field: any, newValue: any) => {
 
 	// Emit validation status first
 	emit('validation', errors);
-	
+
 	// Always emit the update, even if there are validation errors
 	emit('update', updatedFields);
 };
@@ -178,7 +239,7 @@ function validateField(field: any, value: any): ValidationError | null {
 	if (value !== null && value !== undefined && value !== '') {
 		if (field.meta?.interface === 'input' && ['integer', 'decimal'].includes(field.meta.type)) {
 			const numValue = Number(value);
-			
+
 			if (field.meta.options?.min !== undefined && numValue < field.meta.options.min) {
 				return {
 					code: 'VALIDATION_FAILED',
@@ -187,7 +248,7 @@ function validateField(field: any, value: any): ValidationError | null {
 					message: `Value must be greater than or equal to ${field.meta.options.min}`,
 				};
 			}
-			
+
 			if (field.meta.options?.max !== undefined && numValue > field.meta.options.max) {
 				return {
 					code: 'VALIDATION_FAILED',
@@ -204,46 +265,102 @@ function validateField(field: any, value: any): ValidationError | null {
 </script>
 
 <style lang="scss" scoped>
-.dynamic-fields {
-	.field-container {
-		position: relative;
-		margin-bottom: 20px;
+.fields-wrapper {
+	position: relative;
+}
 
-		.field-controls {
-			position: absolute;
-			top: -8px;
-			right: -8px;
-			display: flex;
-			gap: 4px;
-			opacity: 0;
-			transition: opacity var(--fast) var(--transition);
-			z-index: 1;
-			background: var(--theme--background);
-			padding: 4px;
-			border-radius: var(--theme--border-radius);
-		}
+.fields-grid {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 12px;
+	margin-bottom: 20px;
 
-		&:hover .field-controls {
-			opacity: 1;
-		}
-	}
-
-	.field-actions {
-		margin-top: 20px;
-		display: flex;
-		justify-content: flex-end;
-	}
-
-	.delete {
-		--v-button-color: var(--theme--danger);
-		--v-button-background-color: var(--theme--danger-10);
-		--v-button-background-color-hover: var(--theme--danger-25);
-	}
-
-	.add-field {
-		--v-button-color: var(--theme--primary);
-		--v-button-background-color: var(--theme--primary-10);
-		--v-button-background-color-hover: var(--theme--primary-25);
+	:deep(.v-list-item.block + .v-list-item.block) {
+		margin-top: 0;
 	}
 }
-</style> 
+
+.link {
+	display: flex;
+	align-items: center;
+	width: 100%;
+	height: 100%;
+	padding: var(--theme--spacing);
+	margin: 0;
+	color: var(--theme--foreground);
+	background-color: var(--theme--background);
+	border: var(--theme--border-width) solid var(--theme--form--field--input--border-color);
+	border-radius: var(--theme--border-radius);
+	transition: all var(--fast) var(--transition);
+	grid-column: span 2;
+
+	&.half-width {
+		grid-column: span 1;
+	}
+
+	&:hover {
+		background-color: var(--theme--background-accent);
+	}
+
+	.action-buttons {
+		display: flex;
+		gap: 8px;
+		opacity: 1;
+	}
+
+	.v-icon {
+		--v-icon-color: var(--theme--foreground-subdued);
+
+		&:not(:disabled):hover {
+			--v-icon-color: var(--theme--foreground);
+		}
+
+		&:disabled {
+			opacity: 0.5;
+			cursor: not-allowed;
+		}
+
+		&.delete-icon {
+			--v-icon-color: var(--theme--danger);
+		}
+	}
+}
+
+.field-info {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+
+	.field-name {
+		font-weight: 600;
+	}
+
+	.field-details {
+		color: var(--theme--foreground-subdued);
+		font-size: 0.9em;
+	}
+}
+
+.required-icon {
+	color: var(--theme--primary);
+	margin-left: 4px;
+}
+
+.button-group {
+	display: flex;
+	gap: 8px;
+	margin-top: 20px;
+}
+
+.edit-icon {
+	--v-icon-color: var(--theme--primary);
+}
+
+.delete-icon {
+	--v-icon-color: var(--theme--danger);
+}
+
+.field-controls {
+	display: none;
+}
+</style>

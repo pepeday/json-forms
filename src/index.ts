@@ -11,8 +11,8 @@ export default defineInterface({
 	group: 'standard',
 	options:  [
 			{
-				field: 'enableDesigner',
-				name: 'Enable Designer',
+				field: 'enableEditor',
+				name: 'Enable Editor',
 				type: 'boolean',
 				meta: {
 					width: 'full',
