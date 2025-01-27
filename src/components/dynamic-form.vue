@@ -2,8 +2,28 @@
 	<div class="fields-wrapper">
 		<div class="fields-list">
 			<!-- Preview Mode -->
-			<v-form v-if="!editMode" :fields="fieldsWithNames" :model-value="formValues" :primary-key="'+'"
-				:autofocus="false" :validation-errors="validationErrors" @update:model-value="handleFormUpdate" />
+			<template v-if="!editMode">
+				<v-form 
+					v-if="fields.length" 
+					:fields="fieldsWithNames" 
+					:model-value="formValues" 
+					:primary-key="'+'"
+					:autofocus="false" 
+					:validation-errors="validationErrors" 
+					:show-no-visible-fields="false"
+					@update:model-value="handleFormUpdate">
+				</v-form>
+
+				<!-- Empty State Message -->
+				<v-info
+					v-else
+					type="info"
+					:title="t('no_fields')"
+					icon="info"
+					class="empty-state"
+				>
+				</v-info>
+			</template>
 
 			<!-- Edit Mode -->
 			<div v-else>
@@ -64,7 +84,7 @@
 					<v-button small @click="editMode = !editMode">
 						{{ editMode ? t('preview') : t('edit') }}
 					</v-button>
-					<v-button small @click="$emit('add-field')">
+					<v-button small @click="openFieldDialog()">
 						{{ t('add_field') }}
 					</v-button>
 				</div>
@@ -94,13 +114,19 @@ import FormDesigner from './form-designer.vue';
 
 const { t } = useI18n();
 
+const logPrefix = '🔷 [DynamicForm]';
+
 const props = defineProps<{
 	fields: any[];
 	sourceId?: string | number;
 	enableEditor: boolean;
 }>();
 
-console.log('enableEditor', props.enableEditor);
+console.log(`${logPrefix} Component props:`, {
+	fields: props.fields,
+	sourceId: props.sourceId,
+	enableEditor: props.enableEditor
+});
 
 const emit = defineEmits(['update', 'validation', 'edit-field', 'remove-field', 'add-field']);
 
@@ -112,15 +138,15 @@ const editMode = ref(false);
 const showFieldDialog = ref(false);
 const editingField = ref<any>(null);
 
+// Cache common transformations
+const baseTransforms = {
+	schema: null,
+	type: 'string'
+};
+
 // Convert fields to the format expected by v-form
 const fieldsWithNames = computed(() => {
-	// Cache common transformations
-	const baseTransforms = {
-		schema: null,
-		type: 'string'
-	};
-
-	return props.fields.map((field) => ({
+	const fields = props.fields.map((field) => ({
 		...field,
 		...baseTransforms,
 		meta: {
@@ -149,6 +175,9 @@ const fieldsWithNames = computed(() => {
 			field.meta?.interface === 'datetime' ? 'timestamp' : 'string'
 		),
 	}));
+	
+	console.log(`${logPrefix} Transformed fields:`, fields);
+	return fields;
 });
 
 const formValues = computed(() => {
@@ -201,10 +230,16 @@ function saveField(field: any) {
 
 // Replace the current handleFormUpdate with this simpler version
 function handleFormUpdate(newValues: Record<string, any>) {
+	console.log(`${logPrefix} Form update:`, { newValues });
 	const updatedFields = props.fields.map(field => {
 		const newValue = newValues[field.field];
-		// Only create new object if value changed
 		if (field.value === newValue) return field;
+		
+		console.log(`${logPrefix} Field value changed:`, {
+			field: field.field,
+			oldValue: field.value,
+			newValue
+		});
 		
 		return {
 			...field,
@@ -240,7 +275,7 @@ const handleRemoveField = (field: any) => {
 // Handle field edit
 const handleEditField = (field: any) => {
 	console.log('🔵 Editing field:', field);
-	emit('edit-field', field);
+	openFieldDialog(field);
 };
 </script>
 
@@ -342,5 +377,18 @@ const handleEditField = (field: any) => {
 
 .field-controls {
 	display: none;
+}
+
+.empty-state {
+	margin: 8px 0;
+	padding: var(--theme--spacing);
+	
+	:deep(.v-info-title) {
+		font-size: 0.9em;
+	}
+
+	:deep(.v-info-content) {
+		font-size: 0.8em;
+	}
 }
 </style>

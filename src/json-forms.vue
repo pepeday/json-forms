@@ -2,7 +2,7 @@
 
 
 	<!-- Form Designer Mode -->
-	<div v-if="props.jsonField" class="json-form-interface">
+	<div v-if="props.jsonField !== null" class="json-form-interface">
 		<v-notice v-if="loading">Loading...</v-notice>
 		<v-notice v-else-if="error" type="danger">{{ error }}</v-notice>
 		<template v-else>
@@ -19,7 +19,7 @@
 </template>
 
 <script setup lang="ts">
-console.log('version 22');
+console.log('version 24');
 import { ref, watch, inject, type ComputedRef, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import DynamicForm from './components/dynamic-form.vue';
@@ -29,7 +29,7 @@ const props = defineProps<{
 	collection: string;
 	value: any;
 	field: string;
-	jsonField?: string[];
+	jsonField?: string[] | null;
 	primaryKey: string | number | null;
 	validationErrors?: ValidationError[];
 	enableEditor: boolean;
@@ -100,17 +100,31 @@ const useFieldValue = (values: ComputedRef<Record<string, any>> | undefined, fie
 // Use the composable instead of computed
 const fieldValue = useFieldValue(values, props.field);
 
-// Initialize form data
+// Add at the top of script setup
+const logPrefix = '🔍 [JsonForms]';
+
+// Add more detailed logging in key places
 onMounted(() => {
-	logDebug('onMounted', {
-		fieldValue: parseJsonSafely(fieldValue.value),
-		propValue: parseJsonSafely(props.value)
+	console.log(`${logPrefix} Mounting with props:`, {
+		jsonField: props.jsonField ?? [],
+		enableEditor: props.enableEditor,
+		collection: props.collection,
+		value: props.value,
+		field: props.field
 	});
 
 	const initialData = parseJsonSafely(fieldValue.value) ?? parseJsonSafely(props.value);
+	console.log(`${logPrefix} Initial data:`, {
+		parsedFieldValue: parseJsonSafely(fieldValue.value),
+		parsedPropValue: parseJsonSafely(props.value),
+		initialData,
+		isArray: Array.isArray(initialData)
+	});
+
 	if (Array.isArray(initialData)) {
 		jsonFields.value = JSON.parse(JSON.stringify(initialData));
 	} else {
+		console.log(`${logPrefix} No valid initial data, setting empty array`);
 		jsonFields.value = [];
 		emit('input', []);
 	}
