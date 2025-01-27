@@ -9,7 +9,7 @@
             <v-input
               v-model="fieldData.field"
               :disabled="!!props.field"
-              placeholder="t:enter_field_id"
+              :placeholder="t('enter_field_id')"
               required
             />
           </div>
@@ -17,7 +17,7 @@
             <div class="field-label">{{ t('display_name') }}</div>
             <v-input
               v-model="fieldData.name"
-              placeholder="t:enter_display_name"
+              :placeholder="t('enter_display_name')"
             />
           </div>
         </div>
@@ -25,7 +25,7 @@
         <!-- Field Type -->
         <div class="field-grid">
           <div class="field">
-            <div class="field-label">Type</div>
+            <div class="field-label">{{ t('field_type') }}</div>
             <v-select
               v-model="selectedInterface"
               :items="INTERFACE_TYPES"
@@ -34,77 +34,105 @@
             />
           </div>
           <div class="field">
-            <div class="field-label">Field Width</div>
+            <div class="field-label">{{ t('field_width') }}</div>
             <v-select
               v-model="fieldData.meta.width"
               :items="[
-                { text: 'Full Width', value: 'full' },
-                { text: 'Half Width', value: 'half' }
+                { text: t('full_width'), value: 'full' },
+                { text: t('half_width'), value: 'half' }
               ]"
             />
           </div>
         </div>
 
-        <v-checkbox
-          v-if="fieldData.meta.interface !== 'presentation-notice'"
-          v-model="fieldData.meta.required"
-          label="Required Field"
-        />
+        <div class="field-grid">
+          <div class="field">
+            <v-checkbox
+              v-if="fieldData.meta.interface !== 'presentation-notice'"
+              v-model="fieldData.meta.required"
+              :label="t('required_field')"
+            />
+          </div>
+        </div>
 
         <!-- Field Specific Options -->
         <template v-if="hasSpecificOptions">
-          <template v-if="fieldData.meta.interface === 'input'">
-            <v-input
-              v-model="fieldData.meta.options.placeholder"
-              placeholder="t:enter_placeholder"
-              :label="t('placeholder')"
-            />
-            <template v-if="['integer', 'decimal'].includes(fieldData.meta.type)">
-              <div class="field-grid">
-                <v-input
-                  v-model="fieldData.meta.options.min"
-                  :type="fieldData.meta.type"
-                  label="Min Value"
-                />
-                <v-input
-                  v-model="fieldData.meta.options.max"
-                  :type="fieldData.meta.type"
-                  label="Max Value"
-                />
-                <v-input
-                  v-model="fieldData.meta.options.step"
-                  :type="fieldData.meta.type"
-                  label="Step"
+          <template v-if="['input', 'input-multiline'].includes(fieldData.meta.interface)">
+            <div class="field-grid">
+              <div class="field">
+                <div class="field-label">{{ t('input_type') }}</div>
+                <v-select
+                  v-model="selectedInputType"
+                  :items="INPUT_TYPES"
+                  item-text="text"
+                  item-value="value"
                 />
               </div>
-            </template>
-          </template>
+            </div>
 
-          <template v-if="fieldData.meta.interface === 'input-multiline'">
-            <v-input
-              v-model="fieldData.meta.options.placeholder"
-              placeholder="t:enter_placeholder"
-              :label="t('placeholder')"
-            />
+            <div class="field">
+              <div class="field-label">{{ t('placeholder') }}</div>
+              <template v-if="fieldData.meta.options.inputType === 'multiline'">
+                <v-textarea
+                  v-model="fieldData.meta.options.placeholder"
+                  :placeholder="$t('enter_a_placeholder')"
+                />
+              </template>
+              <template v-else>
+                <v-input
+                  v-model="fieldData.meta.options.placeholder"
+                  :placeholder="$t('enter_a_placeholder')"
+                />
+              </template>
+            </div>
+
+            <template v-if="['integer', 'decimal'].includes(fieldData.meta.options.inputType)">
+              <div class="field-grid">
+                <div class="field">
+                  <div class="field-label">{{ t('minimum_value') }}</div>
+                  <v-input
+                    v-model="fieldData.meta.options.min"
+                    :type="fieldData.meta.type"
+                    :placeholder="$t('enter_minimum_value')"
+                  />
+                </div>
+                <div class="field">
+                  <div class="field-label">{{ t('maximum_value') }}</div>
+                  <v-input
+                    v-model="fieldData.meta.options.max"
+                    :type="fieldData.meta.type"
+                    :placeholder="$t('enter_maximum_value')"
+                  />
+                </div>
+                <div class="field">
+                  <div class="field-label">{{ t('step_interval') }}</div>
+                  <v-input
+                    v-model="fieldData.meta.options.step"
+                    :type="fieldData.meta.type"
+                    :placeholder="$t('enter_step_value')"
+                  />
+                </div>
+              </div>
+            </template>
           </template>
 
           <template v-if="fieldData.meta.interface === 'datetime'">
             <div class="field-grid">
               <div class="field">
-                <div class="field-label">Time Format</div>
-                <v-checkbox
-                  v-model="fieldData.meta.options.use24"
-                  label="Use 24-hour format"
-                />
-              </div>
-              <div class="field">
-                <div class="field-label">Date Type</div>
+                <div class="field-label">{{ t('date_type') }}</div>
                 <v-select
                   v-model="fieldData.meta.type"
                   :items="[
-                    { text: 'Date Only', value: 'date' },
-                    { text: 'Date & Time', value: 'timestamp' }
+                    { text: t('date_only'), value: 'date' },
+                    { text: t('date_and_time'), value: 'timestamp' }
                   ]"
+                />
+              </div>
+              <div class="field">
+                <div class="field-label">{{ t('time_format') }}</div>
+                <v-checkbox
+                  v-model="fieldData.meta.options.use24"
+                  :label="t('use_24h_format')"
                 />
               </div>
             </div>
@@ -112,13 +140,16 @@
 
           <template v-if="fieldData.meta.interface === 'select-dropdown'">
             <div class="choices-container">
+              <div class="choices-header">
                 <v-button
                   secondary
                   @click="addChoice"
                   icon="add"
+                  class="add-choice-button"
                 >
-                  Add Choice
+                  {{ t('add_choice') }}
                 </v-button>
+              </div>
               
               <div class="choices-grid">
                 <div 
@@ -130,7 +161,7 @@
                     <div class="field-label">Value</div>
                     <v-input
                       v-model="choice.value"
-                      placeholder="t:enter_choice_value"
+                      :placeholder="$t('displays.labels.choices_value_placeholder')"
                       class="choice-input"
                     />
                   </div>
@@ -138,7 +169,7 @@
                     <div class="field-label">Label</div>
                     <v-input
                       v-model="choice.text"
-                      placeholder="t:enter_choice_label"
+                      :placeholder="$t('displays.labels.choices_text_placeholder')"
                       class="choice-input"
                     />
                   </div>
@@ -161,15 +192,20 @@
 
           <template v-if="fieldData.meta.interface === 'presentation-notice'">
             <div class="field-grid">
-              <v-select
-                v-model="fieldData.meta.options.type"
-                :items="NOTICE_TYPES"
-                label="Notice Type"
-              />
-              <v-textarea
-                v-model="fieldData.meta.options.text"
-                label="Message"
-              />
+              <div class="field">
+                <div class="field-label">{{ t('notice_type') }}</div>
+                <v-select
+                  v-model="fieldData.meta.options.type"
+                  :items="NOTICE_TYPES"
+                />
+              </div>
+              <div class="field">
+                <div class="field-label">{{ t('notice_message') }}</div>
+                <v-textarea
+                  v-model="fieldData.meta.options.text"
+                  :placeholder="$t('enter_notice_message')"
+                />
+              </div>
             </div>
           </template>
         </template>
@@ -184,8 +220,8 @@
     </v-card-text>
 
     <v-card-actions>
-      <v-button secondary @click="$emit('cancel')">Cancel</v-button>
-      <v-button @click="save">Save</v-button>
+      <v-button secondary @click="$emit('cancel')">{{ t('cancel') }}</v-button>
+      <v-button @click="save">{{ t('save') }}</v-button>
     </v-card-actions>
   </v-card>
 </template>
@@ -204,15 +240,18 @@ const emit = defineEmits(['update:field', 'cancel']);
 const { t } = useI18n();
 
 const INTERFACE_TYPES = [
-  { text: t('text'), value: 'input', type: 'string' },
-  { text: t('multiline_text'), value: 'input-multiline', type: 'text' },
-  { text: t('number'), value: 'input', type: 'integer' },
-  { text: t('decimal'), value: 'input', type: 'decimal' },
+  { text: t('input'), value: 'input', type: 'string' },
   { text: t('dropdown'), value: 'select-dropdown', type: 'string' },
   { text: t('boolean'), value: 'boolean', type: 'boolean' },
-  { text: t('date'), value: 'datetime', type: 'date' },
   { text: t('datetime'), value: 'datetime', type: 'timestamp' },
   { text: t('notice'), value: 'presentation-notice', type: 'string' }
+];
+
+const INPUT_TYPES = [
+  { text: t('text'), value: 'text', type: 'string' },
+  { text: t('multiline'), value: 'multiline', type: 'text' },
+  { text: t('number'), value: 'integer', type: 'integer' },
+  { text: t('decimal'), value: 'decimal', type: 'decimal' }
 ];
 
 const NOTICE_TYPES = [
@@ -243,21 +282,50 @@ const selectedInterface = computed({
   get: () => {
     const current = INTERFACE_TYPES.find(
       type => type.value === fieldData.value.meta.interface 
-      && (
-        // For date/time fields
-        (type.value === 'datetime' && ['date', 'timestamp'].includes(fieldData.value.meta.type)) ||
-        // For number fields
-        (type.value === 'input' && ['integer', 'decimal'].includes(fieldData.value.meta.type)) ||
-        // For other fields
-        type.type === fieldData.value.meta.type
-      )
+      && type.type === fieldData.value.meta.type
+      && (!type.inputType || type.inputType === fieldData.value.meta.options?.inputType)
     );
     return current?.value || 'input';
   },
   set: (newValue: string) => {
     const interfaceType = INTERFACE_TYPES.find(type => type.value === newValue);
     if (interfaceType) {
+      fieldData.value.meta.interface = interfaceType.value;
+      fieldData.value.meta.type = interfaceType.type;
       updateInterface(interfaceType);
+    }
+  }
+});
+
+const selectedInputType = computed({
+  get: () => {
+    return fieldData.value.meta.options?.inputType || 'text';
+  },
+  set: (newValue: string) => {
+    const inputType = INPUT_TYPES.find(type => type.value === newValue);
+    if (inputType) {
+      fieldData.value.meta.type = inputType.type;
+      fieldData.value.meta.interface = inputType.value === 'multiline' ? 'input-multiline' : 'input';
+      fieldData.value.meta.options = {
+        ...fieldData.value.meta.options,
+        inputType: inputType.value,
+        ...(inputType.value === 'multiline' && {
+          placeholder: fieldData.value.meta.options?.placeholder || '',
+          trim: true,
+          font: 'sans-serif',
+          clear: false
+        }),
+        ...(inputType.value === 'decimal' && {
+          min: null,
+          max: null,
+          step: 0.01
+        }),
+        ...(inputType.value === 'integer' && {
+          min: null,
+          max: null,
+          step: 1
+        })
+      };
     }
   }
 });
@@ -268,33 +336,19 @@ const hasSpecificOptions = computed(() => {
 });
 
 function updateInterface(interfaceType: any) {
-  fieldData.value.meta.interface = interfaceType.value;
-  fieldData.value.meta.type = interfaceType.type;
-  
-  // Reset options based on interface type
   fieldData.value.meta.options = {};
   
   switch (interfaceType.value) {
     case 'input':
       fieldData.value.meta.options = {
         placeholder: '',
-        ...(interfaceType.type === 'decimal' && {
-          min: null,
-          max: null,
-          step: 0.01
-        }),
-        ...(interfaceType.type === 'integer' && {
-          min: null,
-          max: null,
-          step: 1
-        })
+        inputType: 'text',
+        min: null,
+        max: null,
+        step: null,
+        trim: true
       };
-      break;
-      
-    case 'input-multiline':
-      fieldData.value.meta.options = {
-        placeholder: ''
-      };
+      fieldData.value.meta.type = 'string';
       break;
       
     case 'datetime':
@@ -374,20 +428,27 @@ function removeChoice(index: number) {
 .form {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  margin-bottom: 24px;
   padding: var(--theme--spacing);
+
+  > * + * {
+    margin-top: 24px;
+  }
 }
 
 .field-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: var(--theme--form--column-gap, 32px);
+  grid-gap: var(--theme--form--column-gap, 32px);
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+
+  > * + * {
+    margin-top: 8px;
+  }
 }
 
 .field-label {
@@ -396,28 +457,39 @@ function removeChoice(index: number) {
 }
 
 .choices-container {
-  margin-top: var(--theme--spacing);
+  display: flex;
+  flex-direction: column;
+
+  > * + * {
+    margin-top: 24px;
+  }
 }
 
 .choices-header {
-  margin-bottom: var(--theme--spacing);
+  display: flex;
+  
+  .add-choice-button {
+    min-width: 120px;
+  }
 }
 
 .choices-grid {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+
+  > * + * {
+    margin-top: 24px;
+  }
 }
 
 .choice-row {
   display: grid;
   grid-template-columns: 1fr 1fr auto;
-  gap: var(--theme--form--column-gap, 32px);
+  grid-gap: var(--theme--form--column-gap, 32px);
   align-items: flex-end;
 }
 
 .choice-input {
   margin: 0;
 }
-
 </style>

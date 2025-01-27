@@ -93,7 +93,7 @@
 		<!-- Move dialog here -->
 		<v-dialog v-model="showFieldDialog" @esc="closeFieldDialog">
 			<v-card>
-				<v-card-title>{{ editingField ? 'Edit Field' : 'Add Field' }}</v-card-title>
+				<v-card-title>{{ editingField ? t('edit_field') : t('add_field') }}</v-card-title>
 				<form-designer 
 					v-if="showFieldDialog"
 					:field="editingField"
