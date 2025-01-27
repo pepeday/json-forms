@@ -10,28 +10,12 @@
 				:fields="jsonFields" 
 				:collection="collection"
 				:validation-errors="validationErrors" 
-				@update="handleUpdate" 
+				@update="handleUpdate"
 				@validation="handleValidation"
-				@edit-field="openFieldDialog"
-				@remove-field="removeField"
-				@add-field="openFieldDialog()"
 				:enableEditor="props.enableEditor"
 			/>
 		</template>
 	</div>
-
-	<!-- Field Edit Dialog -->
-	<v-dialog v-model="showFieldDialog" @esc="closeFieldDialog">
-		<v-card>
-			<v-card-title>{{ editingField ? 'Edit Field' : 'Add Field' }}</v-card-title>
-			<form-designer 
-				v-if="showFieldDialog"
-				:field="editingField || getEmptyField()"
-				@update:field="saveField"
-				@cancel="closeFieldDialog"
-			/>
-		</v-card>
-	</v-dialog>
 </template>
 
 <script setup lang="ts">
@@ -39,7 +23,6 @@ console.log('version 22');
 import { ref, watch, inject, type ComputedRef, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import DynamicForm from './components/dynamic-form.vue';
-import FormDesigner from './components/form-designer.vue';
 import type { ValidationError } from '@directus/types';
 
 const props = defineProps<{
@@ -178,13 +161,15 @@ const handleValidation = (errors: ValidationError[]) => {
 	}
 };
 
-// Handle form updates
+// Single update handler for all field changes
 const handleUpdate = (updatedFields: any[]) => {
+	console.log('🔵 json-forms update:', updatedFields);
 	isUpdating.value = true;
-	jsonFields.value = JSON.parse(JSON.stringify(updatedFields));
-
+	
 	clearTimeout(updateTimeout);
 	updateTimeout = setTimeout(() => {
+		jsonFields.value = updatedFields;
+		emit('input', updatedFields);
 		isUpdating.value = false;
 	}, 300);
 };
@@ -207,57 +192,6 @@ watch(
 	},
 	{ immediate: true }
 );
-
-// Add handler for designer updates
-const handleDesignerUpdate = (updatedFields: any[]) => {
-	handleUpdate(updatedFields);
-};
-
-const showFieldDialog = ref(false);
-const editingField = ref<any>(null);
-
-function getEmptyField() {
-	return {
-		field: '',
-		name: '',
-		meta: {
-			interface: 'input',
-			type: 'string',
-			width: 'full',
-			options: {}
-		},
-		value: null
-	};
-}
-
-function openFieldDialog(field?: any) {
-	editingField.value = field ? JSON.parse(JSON.stringify(field)) : null;
-	showFieldDialog.value = true;
-}
-
-function closeFieldDialog() {
-	showFieldDialog.value = false;
-	editingField.value = null;
-}
-
-function saveField(field: any) {
-	const newFields = [...jsonFields.value];
-	const existingIndex = newFields.findIndex(f => f.field === field.field);
-	
-	if (existingIndex >= 0) {
-		newFields[existingIndex] = field;
-	} else {
-		newFields.push(field);
-	}
-	
-	handleUpdate(newFields);
-	closeFieldDialog();
-}
-
-function removeField(field: any) {
-	const newFields = jsonFields.value.filter(f => f.field !== field.field);
-	handleUpdate(newFields);
-}
 </script>
 
 <style lang="scss" scoped>

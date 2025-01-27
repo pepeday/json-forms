@@ -69,6 +69,20 @@
 					</v-button>
 				</div>
 		</div>
+
+		<!-- Move dialog here -->
+		<v-dialog v-model="showFieldDialog" @esc="closeFieldDialog">
+			<v-card>
+				<v-card-title>{{ editingField ? 'Edit Field' : 'Add Field' }}</v-card-title>
+				<form-designer 
+					v-if="showFieldDialog"
+					:field="editingField"
+					:existingFields="fields"
+					@update:field="saveField"
+					@cancel="closeFieldDialog"
+				/>
+			</v-card>
+		</v-dialog>
 	</div>
 </template>
 
@@ -76,7 +90,7 @@
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ValidationError } from '@directus/types';
-// import Draggable from 'vuedraggable';
+import FormDesigner from './form-designer.vue';
 
 const { t } = useI18n();
 
@@ -93,6 +107,10 @@ const emit = defineEmits(['update', 'validation', 'edit-field', 'remove-field', 
 const validationErrors = ref<ValidationError[]>([]);
 
 const editMode = ref(false);
+
+// Add dialog state
+const showFieldDialog = ref(false);
+const editingField = ref<any>(null);
 
 // Convert fields to the format expected by v-form
 const fieldsWithNames = computed(() => {
@@ -150,7 +168,32 @@ const formValues = computed(() => {
 	return values;
 });
 
-// Emit proper update events
+// Dialog handlers
+function openFieldDialog(field?: any) {
+	editingField.value = field ? JSON.parse(JSON.stringify(field)) : null;
+	showFieldDialog.value = true;
+}
+
+function closeFieldDialog() {
+	showFieldDialog.value = false;
+	editingField.value = null;
+}
+
+function saveField(field: any) {
+	const newFields = [...props.fields];
+	const existingIndex = newFields.findIndex(f => f.field === field.field);
+	
+	if (existingIndex >= 0) {
+		newFields[existingIndex] = field;
+	} else {
+		newFields.push(field);
+	}
+	
+	emit('update', newFields);
+	closeFieldDialog();
+}
+
+// Replace the current handleFormUpdate with this simpler version
 function handleFormUpdate(newValues: Record<string, any>) {
 	console.log('🔵 Form update:', newValues);
 	const updatedFields = props.fields.map(field => {
@@ -199,69 +242,6 @@ const handleEditField = (field: any) => {
 	console.log('🔵 Editing field:', field);
 	emit('edit-field', field);
 };
-
-// Handle field updates
-const handleFieldUpdate = (field: any, newValue: any) => {
-
-	// Update the field value regardless of validation
-	const updatedFields = props.fields.map(f => {
-		if (f.field === field.field) {
-			return { ...f, value: newValue };
-		}
-		return f;
-	});
-
-	// Run validation but don't block the update
-	const errors = updatedFields
-		.map(field => validateField(field, field.value))
-		.filter((error): error is ValidationError => error !== null);
-
-	// Emit validation status first
-	emit('validation', errors);
-
-	// Always emit the update, even if there are validation errors
-	emit('update', updatedFields);
-};
-
-// Modify validation function to handle empty states better
-function validateField(field: any, value: any): ValidationError | null {
-	// Only validate required fields when trying to save
-	if (field.meta?.required && (value === null || value === undefined || value === '')) {
-		return {
-			code: 'VALIDATION_FAILED',
-			field: field.field,
-			type: 'validation' as const,
-			message: `${field.name || field.field} is required`,
-		};
-	}
-
-	// Only validate constraints when there is a value
-	if (value !== null && value !== undefined && value !== '') {
-		if (field.meta?.interface === 'input' && ['integer', 'decimal'].includes(field.meta.type)) {
-			const numValue = Number(value);
-
-			if (field.meta.options?.min !== undefined && numValue < field.meta.options.min) {
-				return {
-					code: 'VALIDATION_FAILED',
-					field: field.field,
-					type: 'validation' as const,
-					message: `Value must be greater than or equal to ${field.meta.options.min}`,
-				};
-			}
-
-			if (field.meta.options?.max !== undefined && numValue > field.meta.options.max) {
-				return {
-					code: 'VALIDATION_FAILED',
-					field: field.field,
-					type: 'validation' as const,
-					message: `Value must be less than or equal to ${field.meta.options.max}`,
-				};
-			}
-		}
-	}
-
-	return null;
-}
 </script>
 
 <style lang="scss" scoped>
