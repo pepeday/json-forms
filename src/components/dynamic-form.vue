@@ -114,9 +114,15 @@ const editingField = ref<any>(null);
 
 // Convert fields to the format expected by v-form
 const fieldsWithNames = computed(() => {
+	// Cache common transformations
+	const baseTransforms = {
+		schema: null,
+		type: 'string'
+	};
+
 	return props.fields.map((field) => ({
 		...field,
-		schema: null,
+		...baseTransforms,
 		meta: {
 			...field.meta,
 			field: field.field,
@@ -195,24 +201,18 @@ function saveField(field: any) {
 
 // Replace the current handleFormUpdate with this simpler version
 function handleFormUpdate(newValues: Record<string, any>) {
-	console.log('🔵 Form update:', newValues);
 	const updatedFields = props.fields.map(field => {
 		const newValue = newValues[field.field];
-		let processedValue = newValue;
-
-		if (field.meta?.interface === 'datetime') {
-			if (!newValue) {
-				processedValue = null;
-			} else if (field.meta.type === 'date') {
-				processedValue = newValue.split('T')[0];
-			} else {
-				processedValue = newValue;
-			}
-		}
-
+		// Only create new object if value changed
+		if (field.value === newValue) return field;
+		
 		return {
 			...field,
-			value: processedValue
+			value: field.meta?.interface === 'datetime' && newValue
+				? field.meta.type === 'date'
+					? newValue.split('T')[0]
+					: newValue
+				: newValue
 		};
 	});
 

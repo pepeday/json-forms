@@ -68,22 +68,30 @@ const parseJsonSafely = (value: any) => {
 	return value;
 };
 
-// Add composable to track specific field value
+// Replace the current update handling with this
+const handleUpdate = (updatedFields: any[]) => {
+	// Don't use isUpdating flag for form updates
+	jsonFields.value = updatedFields;
+	emit('input', updatedFields);
+};
+
+// Modify the fieldValue watcher to be more precise
 const useFieldValue = (values: ComputedRef<Record<string, any>> | undefined, fieldName: string) => {
-	// Create a ref to store the last known value
 	const lastValue = ref<any>(undefined);
-
-	// Update function that only triggers when our specific field changes
-	const updateValue = () => {
-		const newValue = values?.value?.[fieldName];
-		if (JSON.stringify(lastValue.value) !== JSON.stringify(newValue)) {
-			lastValue.value = newValue;
-		}
-	};
-
-	// Watch only our field's path
+	
 	if (values) {
-		watch(() => values.value?.[fieldName], updateValue, { immediate: true });
+		watch(
+			() => values.value?.[fieldName],
+			(newValue) => {
+				const parsed = parseJsonSafely(newValue);
+				// Only update if the value is significantly different
+				if (Array.isArray(parsed) && JSON.stringify(parsed) !== JSON.stringify(lastValue.value)) {
+					lastValue.value = parsed;
+					jsonFields.value = parsed;
+				}
+			},
+			{ immediate: true }
+		);
 	}
 
 	return lastValue;
@@ -108,36 +116,23 @@ onMounted(() => {
 	}
 });
 
-// Watch only our specific field value
+// Watch for incoming validation errors from parent
 watch(
-	() => parseJsonSafely(fieldValue.value),
-	(newValue) => {
-		logDebug('field watch', {
-			newValue,
-			isUpdating: isUpdating.value,
-			currentFields: jsonFields.value
-		});
-
-		if (!isUpdating.value && Array.isArray(newValue)) {
-			jsonFields.value = JSON.parse(JSON.stringify(newValue));
+	() => props.validationErrors,
+	(newErrors) => {
+		if (newErrors?.length) {
+			const ourErrors = newErrors
+				.filter(error => error.field.startsWith(`${props.field}(`))
+				.map(error => ({
+					...error,
+					field: error.field.slice(props.field.length + 1, -1),
+				}));
+			validationErrors.value = ourErrors;
+		} else {
+			validationErrors.value = [];
 		}
-	}
-);
-
-// Watch for direct prop changes (e.g., from dropdown)
-watch(
-	() => parseJsonSafely(props.value),
-	(newValue) => {
-		logDebug('props.value watch', {
-			newValue,
-			isUpdating: isUpdating.value,
-			currentFields: jsonFields.value
-		});
-
-		if (!isUpdating.value && Array.isArray(newValue)) {
-			jsonFields.value = JSON.parse(JSON.stringify(newValue));
-		}
-	}
+	},
+	{ immediate: true }
 );
 
 // Handle validation from dynamic form
@@ -160,38 +155,6 @@ const handleValidation = (errors: ValidationError[]) => {
 		emit('input', jsonFields.value);
 	}
 };
-
-// Single update handler for all field changes
-const handleUpdate = (updatedFields: any[]) => {
-	console.log('🔵 json-forms update:', updatedFields);
-	isUpdating.value = true;
-	
-	clearTimeout(updateTimeout);
-	updateTimeout = setTimeout(() => {
-		jsonFields.value = updatedFields;
-		emit('input', updatedFields);
-		isUpdating.value = false;
-	}, 300);
-};
-
-// Watch for incoming validation errors from parent
-watch(
-	() => props.validationErrors,
-	(newErrors) => {
-		if (newErrors?.length) {
-			const ourErrors = newErrors
-				.filter(error => error.field.startsWith(`${props.field}(`))
-				.map(error => ({
-					...error,
-					field: error.field.slice(props.field.length + 1, -1),
-				}));
-			validationErrors.value = ourErrors;
-		} else {
-			validationErrors.value = [];
-		}
-	},
-	{ immediate: true }
-);
 </script>
 
 <style lang="scss" scoped>
