@@ -122,11 +122,6 @@ const props = defineProps<{
 	enableEditor: boolean;
 }>();
 
-console.log(`${logPrefix} Component props:`, {
-	fields: props.fields,
-	sourceId: props.sourceId,
-	enableEditor: props.enableEditor
-});
 
 const emit = defineEmits(['update', 'validation', 'edit-field', 'remove-field', 'add-field']);
 
@@ -176,7 +171,6 @@ const fieldsWithNames = computed(() => {
 		),
 	}));
 	
-	console.log(`${logPrefix} Transformed fields:`, fields);
 	return fields;
 });
 
@@ -230,16 +224,10 @@ function saveField(field: any) {
 
 // Replace the current handleFormUpdate with this simpler version
 function handleFormUpdate(newValues: Record<string, any>) {
-	console.log(`${logPrefix} Form update:`, { newValues });
 	const updatedFields = props.fields.map(field => {
 		const newValue = newValues[field.field];
 		if (field.value === newValue) return field;
-		
-		console.log(`${logPrefix} Field value changed:`, {
-			field: field.field,
-			oldValue: field.value,
-			newValue
-		});
+
 		
 		return {
 			...field,
@@ -261,20 +249,17 @@ function moveField(index: number, direction: 'up' | 'down') {
 	
 	[newFields[index], newFields[newIndex]] = [newFields[newIndex], newFields[index]];
 	
-	console.log('🔵 Reordering fields:', newFields);
 	emit('update', newFields);
 }
 
 // Handle field removal
 const handleRemoveField = (field: any) => {
 	const updatedFields = props.fields.filter(f => f.field !== field.field);
-	console.log('🔵 Removing field:', field.field);
 	emit('update', updatedFields);
 };
 
 // Handle field edit
 const handleEditField = (field: any) => {
-	console.log('🔵 Editing field:', field);
 	openFieldDialog(field);
 };
 </script>

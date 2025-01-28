@@ -45,31 +45,33 @@
           </div>
         </div>
 
+        <!-- After field width selection -->
         <div class="field-grid">
-          <div class="field">
-            <v-checkbox
-              v-if="fieldData.meta.interface !== 'presentation-notice'"
-              v-model="fieldData.meta.required"
-              :label="t('required_field')"
+          <div class="field" v-if="['input', 'input-multiline'].includes(fieldData.meta.interface)">
+            <div class="field-label">{{ t('input_type') }}</div>
+            <v-select
+              v-model="selectedInputType"
+              :items="INPUT_TYPES"
+              item-text="text"
+              item-value="value"
             />
+          </div>
+          <div class="field">
+            <div class="field-label">{{ t('required') }}</div>
+            <div class="field-input">
+              <v-checkbox
+                v-if="fieldData.meta.interface !== 'presentation-notice'"
+                v-model="fieldData.meta.required"
+                :label="t('required_field')"
+                block
+              />
+            </div>
           </div>
         </div>
 
         <!-- Field Specific Options -->
         <template v-if="hasSpecificOptions">
           <template v-if="['input', 'input-multiline'].includes(fieldData.meta.interface)">
-            <div class="field-grid">
-              <div class="field">
-                <div class="field-label">{{ t('input_type') }}</div>
-                <v-select
-                  v-model="selectedInputType"
-                  :items="INPUT_TYPES"
-                  item-text="text"
-                  item-value="value"
-                />
-              </div>
-            </div>
-
             <div class="field">
               <div class="field-label">{{ t('placeholder') }}</div>
               <template v-if="fieldData.meta.options.inputType === 'multiline'">
@@ -144,10 +146,53 @@
                 <v-button
                   secondary
                   @click="addChoice"
-                  icon="add"
-                  class="add-choice-button"
                 >
                   {{ t('add_choice') }}
+                  <v-icon name="add" />
+                </v-button>
+              </div>
+              
+              <div class="choices-grid">
+                <div 
+                  v-for="(choice, index) in fieldData.meta.options.choices" 
+                  :key="index"
+                  class="choice-row"
+                >
+                  <div class="field">
+                    <div class="field-label">Value</div>
+                    <v-input
+                      v-model="choice.value"
+                      :placeholder="$t('displays.labels.choices_value_placeholder')"
+                      class="choice-input"
+                    />
+                  </div>
+                  <div class="field">
+                    <div class="field-label">Label</div>
+                    <v-input
+                      v-model="choice.text"
+                      :placeholder="$t('displays.labels.choices_text_placeholder')"
+                      class="choice-input"
+                    />
+                  </div>
+                  <v-icon
+                    name="close"
+                    clickable
+                    @click="removeChoice(index)"
+                  />
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <template v-if="fieldData.meta.interface === 'select-radio'">
+            <div class="choices-container">
+              <div class="choices-header">
+                <v-button
+                  secondary
+                  @click="addChoice"
+                >
+                  {{ t('add_choice') }}
+                  <v-icon name="add" />
                 </v-button>
               </div>
               
@@ -201,7 +246,7 @@
               </div>
               <div class="field">
                 <div class="field-label">{{ t('notice_message') }}</div>
-                <v-textarea
+                <v-input
                   v-model="fieldData.meta.options.text"
                   :placeholder="$t('enter_notice_message')"
                 />
@@ -242,6 +287,7 @@ const { t } = useI18n();
 const INTERFACE_TYPES = [
   { text: t('input'), value: 'input', type: 'string' },
   { text: t('dropdown'), value: 'select-dropdown', type: 'string' },
+  { text: t('radio'), value: 'select-radio', type: 'string' },
   { text: t('boolean'), value: 'boolean', type: 'boolean' },
   { text: t('datetime'), value: 'datetime', type: 'timestamp' },
   { text: t('notice'), value: 'presentation-notice', type: 'string' }
@@ -331,7 +377,7 @@ const selectedInputType = computed({
 });
 
 const hasSpecificOptions = computed(() => {
-  return ['input', 'input-multiline', 'datetime', 'select-dropdown', 'boolean', 'presentation-notice']
+  return ['input', 'input-multiline', 'datetime', 'select-dropdown', 'select-radio', 'boolean', 'presentation-notice']
     .includes(fieldData.value.meta.interface);
 });
 
@@ -439,7 +485,7 @@ function removeChoice(index: number) {
 .field-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  grid-gap: var(--theme--form--column-gap, 32px);
+  grid-gap: var(--theme--form--column-gap, 8px);
 }
 
 .field {
@@ -485,8 +531,13 @@ function removeChoice(index: number) {
 .choice-row {
   display: grid;
   grid-template-columns: 1fr 1fr auto;
-  grid-gap: var(--theme--form--column-gap, 32px);
-  align-items: flex-end;
+  grid-gap: var(--theme--form--column-gap, 8px);
+  align-items: center;
+}
+
+.choice-row .v-icon {
+  display: flex;
+  align-items: center;
 }
 
 .choice-input {

@@ -19,7 +19,6 @@
 </template>
 
 <script setup lang="ts">
-console.log('version 24');
 import { ref, watch, inject, type ComputedRef, computed, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import DynamicForm from './components/dynamic-form.vue';
@@ -50,11 +49,6 @@ const validationErrors = ref<ValidationError[]>([]);
 
 // Add isDesignMode state
 const disabled = computed(() => props.primaryKey != null); //need to fix this?
-
-// Add debug logging helper
-const logDebug = (location: string, data: any) => {
-	console.log(`🔍 [JsonForms ${location}]:`, data);
-};
 
 // Add helper to safely parse JSON string or return original value
 const parseJsonSafely = (value: any) => {
@@ -105,26 +99,14 @@ const logPrefix = '🔍 [JsonForms]';
 
 // Add more detailed logging in key places
 onMounted(() => {
-	console.log(`${logPrefix} Mounting with props:`, {
-		jsonField: props.jsonField ?? [],
-		enableEditor: props.enableEditor,
-		collection: props.collection,
-		value: props.value,
-		field: props.field
-	});
+
 
 	const initialData = parseJsonSafely(fieldValue.value) ?? parseJsonSafely(props.value);
-	console.log(`${logPrefix} Initial data:`, {
-		parsedFieldValue: parseJsonSafely(fieldValue.value),
-		parsedPropValue: parseJsonSafely(props.value),
-		initialData,
-		isArray: Array.isArray(initialData)
-	});
+
 
 	if (Array.isArray(initialData)) {
 		jsonFields.value = JSON.parse(JSON.stringify(initialData));
 	} else {
-		console.log(`${logPrefix} No valid initial data, setting empty array`);
 		jsonFields.value = [];
 		emit('input', []);
 	}
