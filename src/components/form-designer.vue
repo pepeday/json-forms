@@ -1,6 +1,11 @@
 <template>
-  <v-card>
-    <v-card-text>
+  <v-drawer
+    v-model="showDrawer"
+    :title="props.field ? t('edit_field') : t('add_field')"
+    icon="box"
+    @cancel="$emit('cancel')"
+  >
+    <div class="content">
       <div class="form">
         <!-- Base Fields -->
         <div class="field-grid">
@@ -297,6 +302,34 @@
               </div>
             </div>
           </template>
+
+          <template v-if="fieldData.meta.interface === 'presentation-html'">
+            <div class="field">
+              <div class="field-label">{{ t('html_content') }}</div>
+              <interface-input-rich-text-html
+                :value="fieldData.meta.options.html"
+                :toolbar="[
+                  'bold', 
+                  'italic', 
+                  'underline',
+                  'bullist', 
+                  'numlist',
+                  'removeformat', 
+                  'customImage',
+                  'alignleft', 
+                  'aligncenter',
+                  'h1', 'h2', 'h3',
+                  'table',
+                  'code'
+                ]"
+                :tinymce-overrides="{
+                  entity_encoding: 'raw',
+                  height: 300
+                }"
+                @input="fieldData.meta.options.html = $event"
+              />
+            </div>
+          </template>
         </template>
 
         <v-notice
@@ -306,13 +339,19 @@
           {{ fieldError }}
         </v-notice>
       </div>
-    </v-card-text>
+    </div>
 
-    <v-card-actions>
-      <v-button secondary @click="$emit('cancel')">{{ t('cancel') }}</v-button>
-      <v-button @click="save">{{ t('save') }}</v-button>
-    </v-card-actions>
-  </v-card>
+    <template #actions>
+      <v-button
+        v-tooltip.bottom="t('save')"
+        icon
+        rounded
+        @click="save"
+      >
+        <v-icon name="check" />
+      </v-button>
+    </template>
+  </v-drawer>
 </template>
 
 <script setup lang="ts">
@@ -328,6 +367,14 @@ const emit = defineEmits(['update:field', 'cancel']);
 
 const { t } = useI18n();
 
+const showDrawer = ref(true);
+
+watch(() => showDrawer.value, (newVal) => {
+  if (!newVal) {
+    emit('cancel');
+  }
+});
+
 const INTERFACE_TYPES = [
   { text: t('input'), value: 'input', type: 'string' },
   { text: t('dropdown'), value: 'select-dropdown', type: 'string' },
@@ -335,7 +382,8 @@ const INTERFACE_TYPES = [
   { text: t('checkbox group'), value: 'select-multiple-checkbox', type: 'json' },
   { text: t('boolean'), value: 'boolean', type: 'boolean' },
   { text: t('datetime'), value: 'datetime', type: 'timestamp' },
-  { text: t('notice'), value: 'presentation-notice', type: 'string' }
+  { text: t('notice'), value: 'presentation-notice', type: 'string' },
+  { text: t('html content'), value: 'presentation-html', type: 'text' }
 ];
 
 const INPUT_TYPES = [
@@ -422,8 +470,17 @@ const selectedInputType = computed({
 });
 
 const hasSpecificOptions = computed(() => {
-  return ['input', 'input-multiline', 'datetime', 'select-dropdown', 'select-radio', 'boolean', 'presentation-notice', 'select-multiple-checkbox']
-    .includes(fieldData.value.meta.interface);
+  return [
+    'input', 
+    'input-multiline', 
+    'datetime', 
+    'select-dropdown', 
+    'select-radio', 
+    'boolean', 
+    'presentation-notice', 
+    'select-multiple-checkbox',
+    'presentation-html'
+  ].includes(fieldData.value.meta.interface);
 });
 
 function updateInterface(interfaceType: any) {
@@ -475,7 +532,13 @@ function updateInterface(interfaceType: any) {
         iconOn: 'check_box',
         iconOff: 'check_box_outline_blank',
         color: 'var(--theme--primary)',
-        itemsShown: 8
+        itemsShown: 12
+      };
+      break;
+
+    case 'presentation-html':
+      fieldData.value.meta.options = {
+        html: ''
       };
       break;
   }
@@ -512,6 +575,7 @@ function validateFieldId(): boolean {
 function save() {
   if (!validateFieldId()) return;
   emit('update:field', JSON.parse(JSON.stringify(fieldData.value)));
+  showDrawer.value = false;
 }
 
 function addChoice() {
@@ -527,15 +591,14 @@ function removeChoice(index: number) {
 </script>
 
 <style lang="scss" scoped>
+.content {
+  padding: var(--content-padding);
+}
+
 .form {
   display: flex;
   flex-direction: column;
-  margin-bottom: 24px;
-  padding: var(--theme--spacing);
-
-  > * + * {
-    margin-top: 24px;
-  }
+  gap: 24px;
 }
 
 .field-grid {

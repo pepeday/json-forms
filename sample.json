@@ -170,5 +170,17 @@
             }
         },
         "value": ["red", "blue"]
+    },
+    {
+        "field": "terms_and_conditions",
+        "name": "Terms and Conditions",
+        "meta": {
+            "interface": "presentation-html",
+            "type": "text",
+            "width": "full",
+            "options": {
+                "html": "<h2>Terms of Service</h2><p>By using this service, you agree to:</p><ul><li>Respect our usage guidelines</li><li>Maintain account security</li><li>Provide accurate information</li></ul><p><strong>Note:</strong> Please read all terms carefully.</p>"
+            }
+        }
     }
 ]

@@ -3,9 +3,19 @@
 		<div class="fields-list">
 			<!-- Preview Mode -->
 			<template v-if="!editMode">
+				<!-- Render HTML fields first -->
+				<template v-for="field in fieldsWithNames" :key="field.field">
+					<div 
+						v-if="field.meta.interface === 'presentation-html'"
+						v-html="field.meta.options.html"
+						:class="field.meta.width"
+					></div>
+				</template>
+
+				<!-- Then render the form for other fields -->
 				<v-form 
 					v-if="fields.length" 
-					:fields="fieldsWithNames" 
+					:fields="fieldsWithNames.filter(f => f.meta.interface !== 'presentation-html')" 
 					:model-value="formValues" 
 					:primary-key="'+'"
 					:autofocus="false" 
@@ -91,18 +101,13 @@
 		</div>
 
 		<!-- Move dialog here -->
-		<v-dialog v-model="showFieldDialog" @esc="closeFieldDialog">
-			<v-card>
-				<v-card-title>{{ editingField ? t('edit_field') : t('add_field') }}</v-card-title>
-				<form-designer 
-					v-if="showFieldDialog"
-					:field="editingField"
-					:existingFields="fields"
-					@update:field="saveField"
-					@cancel="closeFieldDialog"
-				/>
-			</v-card>
-		</v-dialog>
+		<form-designer
+			v-if="showFieldDialog"
+			:field="editingField"
+			:existing-fields="fields"
+			@update:field="handleFieldUpdate"
+			@cancel="closeFieldDialog"
+		/>
 	</div>
 </template>
 
@@ -203,12 +208,7 @@ function openFieldDialog(field?: any) {
 	showFieldDialog.value = true;
 }
 
-function closeFieldDialog() {
-	showFieldDialog.value = false;
-	editingField.value = null;
-}
-
-function saveField(field: any) {
+function handleFieldUpdate(field: any) {
 	const newFields = [...props.fields];
 	const existingIndex = newFields.findIndex(f => f.field === field.field);
 	
@@ -220,6 +220,11 @@ function saveField(field: any) {
 	
 	emit('update', newFields);
 	closeFieldDialog();
+}
+
+function closeFieldDialog() {
+	showFieldDialog.value = false;
+	editingField.value = null;
 }
 
 // Replace the current handleFormUpdate with this simpler version
