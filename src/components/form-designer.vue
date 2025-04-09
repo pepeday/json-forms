@@ -253,6 +253,50 @@
               </div>
             </div>
           </template>
+
+          <template v-if="fieldData.meta.interface === 'select-multiple-checkbox'">
+            <div class="choices-container">
+              <div class="choices-header">
+                <v-button
+                  secondary
+                  @click="addChoice"
+                >
+                  {{ t('add_choice') }}
+                  <v-icon name="add" />
+                </v-button>
+              </div>
+              
+              <div class="choices-grid">
+                <div 
+                  v-for="(choice, index) in fieldData.meta.options.choices" 
+                  :key="index"
+                  class="choice-row"
+                >
+                  <div class="field">
+                    <div class="field-label">Value</div>
+                    <v-input
+                      v-model="choice.value"
+                      :placeholder="$t('displays.labels.choices_value_placeholder')"
+                      class="choice-input"
+                    />
+                  </div>
+                  <div class="field">
+                    <div class="field-label">Label</div>
+                    <v-input
+                      v-model="choice.text"
+                      :placeholder="$t('displays.labels.choices_text_placeholder')"
+                      class="choice-input"
+                    />
+                  </div>
+                  <v-icon
+                    name="close"
+                    clickable
+                    @click="removeChoice(index)"
+                  />
+                </div>
+              </div>
+            </div>
+          </template>
         </template>
 
         <v-notice
@@ -288,6 +332,7 @@ const INTERFACE_TYPES = [
   { text: t('input'), value: 'input', type: 'string' },
   { text: t('dropdown'), value: 'select-dropdown', type: 'string' },
   { text: t('radio'), value: 'select-radio', type: 'string' },
+  { text: t('checkbox group'), value: 'select-multiple-checkbox', type: 'json' },
   { text: t('boolean'), value: 'boolean', type: 'boolean' },
   { text: t('datetime'), value: 'datetime', type: 'timestamp' },
   { text: t('notice'), value: 'presentation-notice', type: 'string' }
@@ -377,7 +422,7 @@ const selectedInputType = computed({
 });
 
 const hasSpecificOptions = computed(() => {
-  return ['input', 'input-multiline', 'datetime', 'select-dropdown', 'select-radio', 'boolean', 'presentation-notice']
+  return ['input', 'input-multiline', 'datetime', 'select-dropdown', 'select-radio', 'boolean', 'presentation-notice', 'select-multiple-checkbox']
     .includes(fieldData.value.meta.interface);
 });
 
@@ -420,6 +465,17 @@ function updateInterface(interfaceType: any) {
       fieldData.value.meta.options = {
         text: '',
         type: 'info'
+      };
+      break;
+
+    case 'select-multiple-checkbox':
+      fieldData.value.meta.options = {
+        choices: [],
+        allowOther: false,
+        iconOn: 'check_box',
+        iconOff: 'check_box_outline_blank',
+        color: 'var(--theme--primary)',
+        itemsShown: 8
       };
       break;
   }

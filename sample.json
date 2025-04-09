@@ -135,5 +135,40 @@
             }
         },
         "value": "a"
+    },
+    {
+        "field": "preferred_colors",
+        "name": "Preferred Colors",
+        "meta": {
+            "interface": "select-multiple-checkbox",
+            "type": "json",
+            "width": "full",
+            "options": {
+                "choices": [
+                    {
+                        "text": "Red",
+                        "value": "red"
+                    },
+                    {
+                        "text": "Blue",
+                        "value": "blue"
+                    },
+                    {
+                        "text": "Green",
+                        "value": "green"
+                    },
+                    {
+                        "text": "Yellow",
+                        "value": "yellow"
+                    }
+                ],
+                "allowOther": false,
+                "iconOn": "check_box",
+                "iconOff": "check_box_outline_blank",
+                "color": "var(--theme--primary)",
+                "itemsShown": 8
+            }
+        },
+        "value": ["red", "blue"]
     }
 ]
