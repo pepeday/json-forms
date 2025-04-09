@@ -1,8 +1,9 @@
 <template>
   <v-drawer
-    v-model="showDrawer"
+    v-model="internalActive"
     :title="props.field ? t('edit_field') : t('add_field')"
     icon="box"
+    persistent
     @cancel="$emit('cancel')"
   >
     <div class="content">
@@ -361,15 +362,19 @@ import { useI18n } from 'vue-i18n';
 const props = defineProps<{
   field?: any;
   existingFields?: any[];
+  active: boolean;
 }>();
 
-const emit = defineEmits(['update:field', 'cancel']);
+const emit = defineEmits(['update:field', 'cancel', 'update:active']);
 
 const { t } = useI18n();
 
-const showDrawer = ref(true);
+const internalActive = computed({
+  get: () => props.active,
+  set: (val) => emit('update:active', val)
+});
 
-watch(() => showDrawer.value, (newVal) => {
+watch(() => internalActive.value, (newVal) => {
   if (!newVal) {
     emit('cancel');
   }
@@ -575,7 +580,7 @@ function validateFieldId(): boolean {
 function save() {
   if (!validateFieldId()) return;
   emit('update:field', JSON.parse(JSON.stringify(fieldData.value)));
-  showDrawer.value = false;
+  internalActive.value = false;
 }
 
 function addChoice() {

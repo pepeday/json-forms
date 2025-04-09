@@ -1,6 +1,6 @@
 <template>
 	<div class="fields-wrapper">
-		<div class="fields-list">
+		<div v-if="enableEditor || fields.length > 0" class="fields-list">
 			<!-- Preview Mode -->
 			<template v-if="!editMode">
 				<!-- Render HTML fields first -->
@@ -24,15 +24,11 @@
 					@update:model-value="handleFormUpdate">
 				</v-form>
 
-				<!-- Empty State Message -->
-				<v-info
-					v-else
-					type="info"
-					:title="t('no_fields')"
-					icon="info"
-					class="empty-state"
-				>
-				</v-info>
+				<!-- Subtle Empty State -->
+				<div v-else-if="enableEditor" class="empty-state">
+					<v-icon name="info" />
+					<span >{{ t('no_fields') }}</span>
+				</div>
 			</template>
 
 			<!-- Edit Mode -->
@@ -102,7 +98,7 @@
 
 		<!-- Move dialog here -->
 		<form-designer
-			v-if="showFieldDialog"
+			v-model:active="showFieldDialog"
 			:field="editingField"
 			:existing-fields="fields"
 			@update:field="handleFieldUpdate"
@@ -370,15 +366,16 @@ const handleEditField = (field: any) => {
 }
 
 .empty-state {
-	margin: 8px 0;
-	padding: var(--theme--spacing);
-	
-	:deep(.v-info-title) {
-		font-size: 0.9em;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--theme--foreground-subdued);
+	font-size: 0.9em;
+	padding: 8px 0;
+
+	.v-icon {
+		--v-icon-color: var(--theme--foreground-subdued);
 	}
 
-	:deep(.v-info-content) {
-		font-size: 0.8em;
-	}
 }
 </style>
