@@ -11,19 +11,20 @@
         <!-- Base Fields -->
         <div class="field-grid">
           <div class="field">
+            <div class="field-label">{{ t('display_name') }}</div>
+            <v-input
+              v-model="fieldData.name"
+              :placeholder="t('enter_display_name')"
+              @update:model-value="updateFieldId"
+              required
+            />
+          </div>
+          <div class="field">
             <div class="field-label">{{ t('field_id') }}</div>
             <v-input
               v-model="fieldData.field"
               :disabled="!!props.field"
               :placeholder="t('enter_field_id')"
-              required
-            />
-          </div>
-          <div class="field">
-            <div class="field-label">{{ t('display_name') }}</div>
-            <v-input
-              v-model="fieldData.name"
-              :placeholder="t('enter_display_name')"
             />
           </div>
         </div>
@@ -165,18 +166,19 @@
                   class="choice-row"
                 >
                   <div class="field">
-                    <div class="field-label">Value</div>
-                    <v-input
-                      v-model="choice.value"
-                      :placeholder="$t('displays.labels.choices_value_placeholder')"
-                      class="choice-input"
-                    />
-                  </div>
-                  <div class="field">
                     <div class="field-label">Label</div>
                     <v-input
                       v-model="choice.text"
-                      :placeholder="$t('displays.labels.choices_text_placeholder')"
+                      :placeholder="t('enter_choice_label')"
+                      class="choice-input"
+                      @update:model-value="updateChoiceValue(index)"
+                    />
+                  </div>
+                  <div class="field">
+                    <div class="field-label">Value</div>
+                    <v-input
+                      v-model="choice.value"
+                      :placeholder="t('enter_choice_value')"
                       class="choice-input"
                     />
                   </div>
@@ -209,18 +211,19 @@
                   class="choice-row"
                 >
                   <div class="field">
-                    <div class="field-label">Value</div>
-                    <v-input
-                      v-model="choice.value"
-                      :placeholder="$t('displays.labels.choices_value_placeholder')"
-                      class="choice-input"
-                    />
-                  </div>
-                  <div class="field">
                     <div class="field-label">Label</div>
                     <v-input
                       v-model="choice.text"
-                      :placeholder="$t('displays.labels.choices_text_placeholder')"
+                      :placeholder="t('enter_choice_label')"
+                      class="choice-input"
+                      @update:model-value="updateChoiceValue(index)"
+                    />
+                  </div>
+                  <div class="field">
+                    <div class="field-label">Value</div>
+                    <v-input
+                      v-model="choice.value"
+                      :placeholder="t('enter_choice_value')"
                       class="choice-input"
                     />
                   </div>
@@ -279,18 +282,19 @@
                   class="choice-row"
                 >
                   <div class="field">
-                    <div class="field-label">Value</div>
-                    <v-input
-                      v-model="choice.value"
-                      :placeholder="$t('displays.labels.choices_value_placeholder')"
-                      class="choice-input"
-                    />
-                  </div>
-                  <div class="field">
                     <div class="field-label">Label</div>
                     <v-input
                       v-model="choice.text"
-                      :placeholder="$t('displays.labels.choices_text_placeholder')"
+                      :placeholder="t('enter_choice_label')"
+                      class="choice-input"
+                      @update:model-value="updateChoiceValue(index)"
+                    />
+                  </div>
+                  <div class="field">
+                    <div class="field-label">Value</div>
+                    <v-input
+                      v-model="choice.value"
+                      :placeholder="t('enter_choice_value')"
                       class="choice-input"
                     />
                   </div>
@@ -405,8 +409,10 @@ const NOTICE_TYPES = [
   { text: 'Danger', value: 'danger' }
 ];
 
-const fieldData = ref(props.field ? { ...props.field } : {
-  field: generateUniqueId(),
+let previousAutoId = '';
+
+const getDefaultFieldData = () => ({
+  field: '',
   name: '',
   meta: {
     interface: 'input',
@@ -418,6 +424,14 @@ const fieldData = ref(props.field ? { ...props.field } : {
     }
   },
   value: null
+});
+
+const fieldData = ref(props.field ? { ...props.field } : getDefaultFieldData());
+
+watch(() => props.active, (newVal) => {
+  if (newVal && !props.field) {
+    fieldData.value = getDefaultFieldData();
+  }
 });
 
 const fieldError = ref('');
@@ -583,15 +597,45 @@ function save() {
   internalActive.value = false;
 }
 
+function formatValueFromLabel(label: string): string {
+  return label
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '_') // Replace special chars and spaces with underscore
+    .replace(/^_+|_+$/g, '')     // Remove leading/trailing underscores
+    .replace(/_+/g, '_');        // Replace multiple underscores with single
+}
+
+function updateChoiceValue(index: number) {
+  const choice = fieldData.value.meta.options.choices[index];
+  // Generate the new value from the current text
+  const newValue = formatValueFromLabel(choice.text);
+  
+  // Update if empty or if the current value was auto-generated from a previous text
+  const previousValue = formatValueFromLabel(choice.text.slice(0, -1));
+  if (!choice.value || choice.value === '' || choice.value === previousValue) {
+    choice.value = newValue;
+  }
+}
+
 function addChoice() {
   if (!fieldData.value.meta.options.choices) {
     fieldData.value.meta.options.choices = [];
   }
-  fieldData.value.meta.options.choices.push({ value: '', text: '' });
+  fieldData.value.meta.options.choices.push({ text: '', value: '' });
 }
 
 function removeChoice(index: number) {
   fieldData.value.meta.options.choices.splice(index, 1);
+}
+
+function updateFieldId() {
+  // Only auto-generate if this is a new field and the ID hasn't been manually edited
+  if (!props.field && (!fieldData.value.field || fieldData.value.field === previousAutoId)) {
+    const newId = formatValueFromLabel(fieldData.value.name);
+    fieldData.value.field = newId ? `field_${newId}` : generateUniqueId();
+    previousAutoId = fieldData.value.field;
+  }
 }
 </script>
 
