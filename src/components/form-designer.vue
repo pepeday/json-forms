@@ -598,6 +598,8 @@ function save() {
 }
 
 function formatValueFromLabel(label: string): string {
+  if (!label) return '';
+
   return label
     .toLowerCase()
     .trim()
@@ -608,6 +610,12 @@ function formatValueFromLabel(label: string): string {
 
 function updateChoiceValue(index: number) {
   const choice = fieldData.value.meta.options.choices[index];
+  // If text is empty, clear the value too
+  if (!choice.text) {
+    choice.value = '';
+    return;
+  }
+
   // Generate the new value from the current text
   const newValue = formatValueFromLabel(choice.text);
   

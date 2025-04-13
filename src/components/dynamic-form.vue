@@ -7,9 +7,10 @@
 				<template v-for="field in fieldsWithNames" :key="field.field">
 					<div 
 						v-if="field.meta.interface === 'presentation-html'"
-						v-html="field.meta.options.html"
-						:class="field.meta.width"
-					></div>
+						:class="['wysiwyg-content', field.meta.width]"
+					>
+						<div class="wysiwyg-wrapper" v-html="field.meta.options.html"></div>
+					</div>
 				</template>
 
 				<!-- Then render the form for other fields -->
@@ -265,6 +266,16 @@ const handleEditField = (field: any) => {
 };
 </script>
 
+<style>
+/* Global styles for WYSIWYG content */
+.wysiwyg-content .wysiwyg-wrapper img {
+	max-width: 100% !important;
+	height: auto !important;
+	display: block !important;
+	margin: 8px auto !important;
+}
+</style>
+
 <style lang="scss" scoped>
 .fields-wrapper {
 	position: relative;
@@ -377,5 +388,22 @@ const handleEditField = (field: any) => {
 		--v-icon-color: var(--theme--foreground-subdued);
 	}
 
+}
+
+.wysiwyg-content {
+	width: 100%;
+	max-width: 100%;
+	overflow: hidden;
+	
+	.wysiwyg-wrapper {
+		width: 100%;
+		max-width: 100%;
+		display: block;
+		
+		:deep(table) {
+			max-width: 100%;
+			overflow-x: auto;
+		}
+	}
 }
 </style>
