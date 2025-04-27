@@ -3,27 +3,30 @@
 		<div v-if="enableEditor || fields.length > 0" class="fields-list">
 			<!-- Preview Mode -->
 			<template v-if="!editMode">
-				<template v-for="field in fieldsWithNames" :key="field.field">
+				<div class="form-grid">
 					<!-- HTML fields -->
-					<div 
-						v-if="field.meta.interface === 'presentation-html'"
-						:class="['wysiwyg-content', field.meta.width]"
-					>
-						<div class="wysiwyg-wrapper" v-html="field.meta.options.html"></div>
-					</div>
-					
-					<!-- Other fields -->
-					<v-form 
-						v-else
-						:fields="[field]"
-						:model-value="formValues"
-						:primary-key="'+'"
-						:autofocus="false"
-						:validation-errors="validationErrors"
-						:show-no-visible-fields="false"
-						@update:model-value="handleFormUpdate"
-					/>
-				</template>
+					<template v-for="field in fieldsWithNames" :key="field.field">
+						<div 
+							v-if="field.meta.interface === 'presentation-html'"
+							:class="['wysiwyg-content', field.meta.width]"
+						>
+							<div class="wysiwyg-wrapper" v-html="field.meta.options.html"></div>
+						</div>
+						
+						<!-- Other fields -->
+						<v-form 
+							v-else
+							:fields="[{...field, meta: {...field.meta, width: undefined}}]"
+							:model-value="formValues"
+							:primary-key="'+'"
+							:autofocus="false"
+							:validation-errors="validationErrors"
+							:show-no-visible-fields="false"
+							@update:model-value="handleFormUpdate"
+							:class="field.meta.width"
+						/>
+					</template>
+				</div>
 
 				<!-- Subtle Empty State -->
 				<div v-if="!fields.length && enableEditor" class="empty-state">
@@ -34,57 +37,55 @@
 
 			<!-- Edit Mode -->
 			<div v-else>
-				<div class="fields-grid">
-					<v-list-item 
-						v-for="(field, index) in fieldsWithNames" 
-						:key="field.field"
-						v-tooltip="'Click to edit'"
-						clickable
-						block
-						class="link"
-						:class="{ 'half-width': field.meta?.width === 'half' }"
-						@click="handleEditField(field)"
-					>
-						<v-list-item-content>
-							<div class="field-info">
-								<span class="field-name">
-									{{ field.name }}
-									<v-icon 
-										v-if="field.meta?.required" 
-										class="required"
-										sup
-										name="star"
-										filled
-									/>
-								</span>
-								<span class="field-details">{{ field.field }} ({{ field.meta.interface }})</span>
-							</div>
-						</v-list-item-content>
+				<Draggable
+					v-model="fieldsWithNames"
+					class="fields-grid"
+					handle=".drag-handle"
+					item-key="field"
+					@change="handleDragChange"
+				>
+					<template #item="{ element: field, index }">
+						<v-list-item 
+							v-tooltip="'Click to edit'"
+							clickable
+							block
+							class="link"
+							:class="{ 'half-width': field.meta?.width === 'half' }"
+							@click="handleEditField(field)"
+						>
+							<v-icon 
+								name="drag_handle" 
+								class="drag-handle"
+								clickable
+							/>
+							<v-list-item-content>
+								<div class="field-info">
+									<span class="field-name">
+										{{ field.name }}
+										<v-icon 
+											v-if="field.meta?.required" 
+											class="required"
+											sup
+											name="star"
+											filled
+										/>
+									</span>
+									<span class="field-details">{{ field.field }} ({{ field.meta.interface }})</span>
+								</div>
+							</v-list-item-content>
 
-						<v-list-item-action class="action-buttons">
-							<v-icon 
-								name="arrow_upward" 
-								clickable 
-								:disabled="index === 0"
-								@click.stop.prevent="moveField(index, 'up')" 
-							/>
-							<v-icon 
-								name="arrow_downward" 
-								clickable 
-								:disabled="index === fieldsWithNames.length - 1"
-								@click.stop.prevent="moveField(index, 'down')" 
-							/>
-							<v-icon 
-								name="delete" 
-								clickable 
-								class="delete-icon"
-								v-tooltip="'Remove Field'"
-								@click.stop="handleRemoveField(field)" 
-							/>
-						</v-list-item-action>
-					</v-list-item>
-				</div>
-
+							<v-list-item-action class="action-buttons">
+								<v-icon 
+									name="delete" 
+									clickable 
+									class="delete-icon"
+									v-tooltip="'Remove Field'"
+									@click.stop="handleRemoveField(field)" 
+								/>
+							</v-list-item-action>
+						</v-list-item>
+					</template>
+				</Draggable>
 			</div>
 
 			<div v-if="enableEditor" class="button-group">
@@ -113,6 +114,7 @@ import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ValidationError } from '@directus/types';
 import FormDesigner from './form-designer.vue';
+import Draggable from 'vuedraggable';
 
 const { t } = useI18n();
 
@@ -264,6 +266,17 @@ const handleRemoveField = (field: any) => {
 const handleEditField = (field: any) => {
 	openFieldDialog(field);
 };
+
+// Replace the current handleDragChange function
+function handleDragChange(event: any) {
+	if (event.moved) {
+		const { oldIndex, newIndex } = event.moved;
+		const newFields = [...props.fields];
+		const [movedField] = newFields.splice(oldIndex, 1);
+		newFields.splice(newIndex, 0, movedField);
+		emit('update', newFields);
+	}
+}
 </script>
 
 <style>
@@ -284,11 +297,25 @@ const handleEditField = (field: any) => {
 .fields-grid {
 	display: grid;
 	grid-template-columns: repeat(2, 1fr);
-	gap: 12px;
-	margin-bottom: 20px;
+	gap: var(--theme--form--column-gap);
+	width: 100%;
 
-	:deep(.v-list-item.block + .v-list-item.block) {
-		margin-top: 0;
+	:deep(.full) {
+		grid-column: span 2;
+	}
+
+	:deep(.half) {
+		grid-column: span 1;
+	}
+
+	.wysiwyg-content {
+		&.full {
+			grid-column: span 2;
+		}
+
+		&.half {
+			grid-column: span 1;
+		}
 	}
 }
 
@@ -404,6 +431,16 @@ const handleEditField = (field: any) => {
 			max-width: 100%;
 			overflow-x: auto;
 		}
+	}
+}
+
+.drag-handle {
+	cursor: move;
+	margin-right: 8px;
+	--v-icon-color: var(--theme--foreground-subdued);
+
+	&:hover {
+		--v-icon-color: var(--theme--foreground);
 	}
 }
 </style>
