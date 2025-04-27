@@ -50,7 +50,9 @@
 							clickable
 							block
 							class="link"
-							:class="{ 'half-width': field.meta?.width === 'half' }"
+							:class="{ 
+								'half-width': field.meta?.width === 'half'
+							}"
 							@click="handleEditField(field)"
 						>
 							<v-icon 
@@ -299,24 +301,6 @@ function handleDragChange(event: any) {
 	grid-template-columns: repeat(2, 1fr);
 	gap: var(--theme--form--column-gap);
 	width: 100%;
-
-	:deep(.full) {
-		grid-column: span 2;
-	}
-
-	:deep(.half) {
-		grid-column: span 1;
-	}
-
-	.wysiwyg-content {
-		&.full {
-			grid-column: span 2;
-		}
-
-		&.half {
-			grid-column: span 1;
-		}
-	}
 }
 
 .link {
@@ -325,7 +309,6 @@ function handleDragChange(event: any) {
 	width: 100%;
 	height: 100%;
 	padding: var(--theme--spacing);
-	margin: 0;
 	color: var(--theme--foreground);
 	background-color: var(--theme--background);
 	border: var(--theme--border-width) solid var(--theme--form--field--input--border-color);
@@ -335,6 +318,7 @@ function handleDragChange(event: any) {
 
 	&.half-width {
 		grid-column: span 1;
+		margin-top: var(--v-list-item-margin, 8px);
 	}
 
 	&:hover {
@@ -363,6 +347,8 @@ function handleDragChange(event: any) {
 			--v-icon-color: var(--theme--danger);
 		}
 	}
+
+	min-height: var(--theme--list-item-height);
 }
 
 .field-info {
