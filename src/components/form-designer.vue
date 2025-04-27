@@ -428,11 +428,13 @@ const getDefaultFieldData = () => ({
 
 const fieldData = ref(props.field ? { ...props.field } : getDefaultFieldData());
 
-watch(() => props.active, (newVal) => {
-  if (newVal && !props.field) {
+watch(() => props.field, (newField) => {
+  if (newField) {
+    fieldData.value = JSON.parse(JSON.stringify(newField));
+  } else {
     fieldData.value = getDefaultFieldData();
   }
-});
+}, { immediate: true });
 
 const fieldError = ref('');
 

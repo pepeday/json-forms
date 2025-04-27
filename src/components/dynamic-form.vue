@@ -3,32 +3,32 @@
 		<div v-if="enableEditor || fields.length > 0" class="fields-list">
 			<!-- Preview Mode -->
 			<template v-if="!editMode">
-				<!-- Render HTML fields first -->
 				<template v-for="field in fieldsWithNames" :key="field.field">
+					<!-- HTML fields -->
 					<div 
 						v-if="field.meta.interface === 'presentation-html'"
 						:class="['wysiwyg-content', field.meta.width]"
 					>
 						<div class="wysiwyg-wrapper" v-html="field.meta.options.html"></div>
 					</div>
+					
+					<!-- Other fields -->
+					<v-form 
+						v-else
+						:fields="[field]"
+						:model-value="formValues"
+						:primary-key="'+'"
+						:autofocus="false"
+						:validation-errors="validationErrors"
+						:show-no-visible-fields="false"
+						@update:model-value="handleFormUpdate"
+					/>
 				</template>
 
-				<!-- Then render the form for other fields -->
-				<v-form 
-					v-if="fields.length" 
-					:fields="fieldsWithNames.filter(f => f.meta.interface !== 'presentation-html')" 
-					:model-value="formValues" 
-					:primary-key="'+'"
-					:autofocus="false" 
-					:validation-errors="validationErrors" 
-					:show-no-visible-fields="false"
-					@update:model-value="handleFormUpdate">
-				</v-form>
-
 				<!-- Subtle Empty State -->
-				<div v-else-if="enableEditor" class="empty-state">
+				<div v-if="!fields.length && enableEditor" class="empty-state">
 					<v-icon name="info" />
-					<span >{{ t('no_fields') }}</span>
+					<span>{{ t('no_fields') }}</span>
 				</div>
 			</template>
 
