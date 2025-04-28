@@ -4,8 +4,8 @@
 			<!-- Preview Mode -->
 			<template v-if="!editMode">
 				<div class="form-grid">
-					<!-- HTML fields -->
 					<template v-for="field in fieldsWithNames" :key="field.field">
+						<!-- HTML fields -->
 						<div 
 							v-if="field.meta.interface === 'presentation-html'"
 							:class="['wysiwyg-content', field.meta.width]"
@@ -14,17 +14,22 @@
 						</div>
 						
 						<!-- Other fields -->
-						<v-form 
-							v-else
-							:fields="[{...field, meta: {...field.meta, width: undefined}}]"
-							:model-value="formValues"
-							:primary-key="'+'"
-							:autofocus="false"
-							:validation-errors="validationErrors"
-							:show-no-visible-fields="false"
-							@update:model-value="handleFormUpdate"
+						<div 
+							v-else 
 							:class="field.meta.width"
-						/>
+						>
+							<div class="field">
+								<div class="field-label">{{ field.name }}</div>
+								<div class="interface">
+									<component 
+										:is="`interface-${field.meta.interface}`"
+										v-bind="field.meta"
+										:value="formValues[field.field]"
+										@input="value => handleFormUpdate({ ...formValues, [field.field]: value })"
+									/>
+								</div>
+							</div>
+						</div>
 					</template>
 				</div>
 
