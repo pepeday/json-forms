@@ -4,8 +4,8 @@
 			<!-- Preview Mode -->
 			<template v-if="!editMode">
 				<div class="form-grid">
+					<!-- Fields -->
 					<template v-for="field in fieldsWithNames" :key="field.field">
-						<!-- HTML fields -->
 						<div 
 							v-if="field.meta.interface === 'presentation-html'"
 							:class="['wysiwyg-content', field.meta.width]"
@@ -13,21 +13,18 @@
 							<div class="wysiwyg-wrapper" v-html="field.meta.options.html"></div>
 						</div>
 						
-						<!-- Other fields -->
 						<div 
 							v-else 
-							:class="field.meta.width"
+							:class="['field', field.meta.width]"
 						>
-							<div class="field">
-								<div class="field-label">{{ field.name }}</div>
-								<div class="interface">
-									<component 
-										:is="`interface-${field.meta.interface}`"
-										v-bind="field.meta"
-										:value="formValues[field.field]"
-										@input="value => handleFormUpdate({ ...formValues, [field.field]: value })"
-									/>
-								</div>
+							<div class="field-label">{{ field.name }}</div>
+							<div class="interface">
+								<component 
+									:is="`interface-${field.meta.interface}`"
+									v-bind="field.meta"
+									:value="formValues[field.field]"
+									@input="(value: any) => handleFormUpdate({ ...formValues, [field.field]: value })"
+								/>
 							</div>
 						</div>
 					</template>
@@ -301,6 +298,23 @@ function handleDragChange(event: any) {
 	position: relative;
 }
 
+.form-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: var(--theme--form--column-gap);
+	width: 100%;
+
+	.field {
+		&.full {
+			grid-column: 1 / -1;
+		}
+
+		&.half {
+			grid-column: span 1;
+		}
+	}
+}
+
 .fields-grid {
 	display: grid;
 	grid-template-columns: repeat(2, 1fr);
@@ -432,6 +446,18 @@ function handleDragChange(event: any) {
 
 	&:hover {
 		--v-icon-color: var(--theme--foreground);
+	}
+}
+
+@media (max-width: 959px) {
+	.form-grid {
+		grid-template-columns: 1fr;  /* Force single column layout */
+		
+		.field {
+			&.half, &.half-right {
+				grid-column: 1 / -1;  /* Make both half and half-right fields full width */
+			}
+		}
 	}
 }
 </style>
