@@ -8,6 +8,10 @@
   >
     <div class="content">
       <div class="form">
+        <v-notice v-if="validationError" type="danger">
+          {{ validationError }}
+        </v-notice>
+
         <!-- Base Fields -->
         <div class="field-grid">
           <div class="field">
@@ -25,6 +29,8 @@
               v-model="fieldData.field"
               :disabled="!!props.field"
               :placeholder="t('enter_field_id')"
+              @update:model-value="updateFieldId"
+              :error="validationError"
             />
           </div>
         </div>
@@ -336,13 +342,6 @@
             </div>
           </template>
         </template>
-
-        <v-notice
-          v-if="fieldError"
-          type="danger"
-        >
-          {{ fieldError }}
-        </v-notice>
       </div>
     </div>
 
@@ -351,7 +350,7 @@
         v-tooltip.bottom="t('save')"
         icon
         rounded
-        @click="save"
+        @click="handleSave"
       >
         <v-icon name="check" />
       </v-button>
@@ -428,8 +427,11 @@ const getDefaultFieldData = () => ({
 
 const fieldData = ref(props.field ? { ...props.field } : getDefaultFieldData());
 
+const validationError = ref<string | null>(null);
+
 watch(() => props.active, (newVal) => {
   if (newVal) {
+    validationError.value = null;
     if (props.field) {
       fieldData.value = JSON.parse(JSON.stringify(props.field));
     } else {
@@ -437,8 +439,6 @@ watch(() => props.active, (newVal) => {
     }
   }
 }, { immediate: true });
-
-const fieldError = ref('');
 
 const selectedInterface = computed({
   get: () => {
@@ -571,33 +571,26 @@ function generateUniqueId() {
   return `field_${Date.now()}${Math.floor(Math.random() * 1000)}`;
 }
 
-function validateFieldId(): boolean {
-  if (!fieldData.value.field) {
-    fieldError.value = 'Field ID is required';
-    return false;
+function handleSave() {
+  // Validate required fields
+  if (!fieldData.value.name || !fieldData.value.field) {
+    validationError.value = t('required_fields_missing');
+    return;
   }
 
-  // If we're editing an existing field, allow the same ID
-  if (props.field?.field === fieldData.value.field) {
-    return true;
-  }
-
-  const existingField = props.existingFields?.find(
-    f => f.field === fieldData.value.field
+  // Check if field ID already exists
+  const isDuplicate = props.existingFields?.some(
+    f => f.field === fieldData.value.field && (!props.field || f.field !== props.field.field)
   );
 
-  if (existingField) {
-    fieldError.value = `This ID is already used. Try: ${fieldData.value.field}_${Date.now()}`;
-    return false;
+  if (isDuplicate) {
+    validationError.value = t('field_id_already_exists');
+    return;
   }
 
-  fieldError.value = '';
-  return true;
-}
-
-function save() {
-  if (!validateFieldId()) return;
-  emit('update:field', JSON.parse(JSON.stringify(fieldData.value)));
+  validationError.value = null;
+  const fieldToSave = JSON.parse(JSON.stringify(fieldData.value));
+  emit('update:field', fieldToSave);
   internalActive.value = false;
 }
 
@@ -642,6 +635,9 @@ function removeChoice(index: number) {
 }
 
 function updateFieldId() {
+  // Clear validation error when field ID changes
+  validationError.value = null;
+
   // Only auto-generate if this is a new field and the ID hasn't been manually edited
   if (!props.field && (!fieldData.value.field || fieldData.value.field === previousAutoId)) {
     const newId = formatValueFromLabel(fieldData.value.name);
