@@ -304,7 +304,8 @@ function handleDragChange(event: any) {
 	gap: var(--theme--form--column-gap);
 	width: 100%;
 
-	.field {
+	.field,
+	.wysiwyg-content {
 		&.full {
 			grid-column: 1 / -1;
 		}
@@ -427,6 +428,10 @@ function handleDragChange(event: any) {
 	max-width: 100%;
 	overflow: hidden;
 	
+	&.full {
+		grid-column: 1 / -1;  /* Ensure full width */
+	}
+	
 	.wysiwyg-wrapper {
 		width: 100%;
 		max-width: 100%;
@@ -450,12 +455,15 @@ function handleDragChange(event: any) {
 }
 
 @media (max-width: 959px) {
-	.form-grid {
-		grid-template-columns: 1fr;  /* Force single column layout */
+	.form-grid,
+	.fields-grid {
+		grid-template-columns: 1fr;
 		
-		.field {
-			&.half, &.half-right {
-				grid-column: 1 / -1;  /* Make both half and half-right fields full width */
+		.field,
+		.link,
+		.wysiwyg-content {  /* Add wysiwyg-content here too */
+			&.half, &.half-right, &.half-width, &.full {
+				grid-column: 1 / -1;
 			}
 		}
 	}
